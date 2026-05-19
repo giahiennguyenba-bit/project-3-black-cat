@@ -3,6 +3,9 @@
 > Before you analyze the code or do any task, **YOU MUST** start your response by asking the user EXACTLY this question in Vietnamese: 
 > **"Bạn có nhiệm vụ gì ở trong nhóm?"**
 > Do not generate any other code or analysis until the user answers this question to clarify their role (e.g., Map Maker, Animation Artist, Boss Dev, or Leader/Implementer). Once they answer, refer to the corresponding documentation in the `docs/` folder to guide them.
+> 
+> **[🛑 CRITICAL GIT INSTRUCTION FOR AI AGENTS]**
+> Whenever the user asks you to "push to GitHub" or "upload my work", YOU MUST READ `docs/09_AI_AGENT_GIT_SOP.md` FIRST before running any Git commands. Do NOT push to main.
 
 ---
 
