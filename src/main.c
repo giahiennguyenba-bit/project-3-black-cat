@@ -21,6 +21,7 @@ const int totalMaps = 2;
 
 int main(void) {
   InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "The Forest - Press 'R' to Switch Maps");
+  InitAudioDevice(); // Kích hoạt hệ thống âm thanh (Rất quan trọng cho Vibecoding)
   SetTargetFPS(60);
 
   RenderTexture2D target = LoadRenderTexture(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
@@ -126,6 +127,7 @@ int main(void) {
   UnloadTexture(texTiles);
   MapUnload(map);
   UnloadRenderTexture(target);
+  CloseAudioDevice(); // Đóng hệ thống âm thanh
   CloseWindow();
   return 0;
 }

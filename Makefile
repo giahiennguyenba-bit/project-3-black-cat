@@ -4,8 +4,8 @@ CC = gcc
 CFLAGS = -Wall -Iraylib/include -std=c99 -Wno-missing-braces
 LDFLAGS = -Lraylib/lib -lraylib -lopengl32 -lgdi32 -lwinmm
 
-# Tệp nguồn chính
-SRC = src/main.c src/game.c src/camera.c src/map.c
+# Tệp nguồn chính (Tự động biên dịch tất cả file .c trong thư mục src)
+SRC = $(wildcard src/*.c)
 OBJ = $(SRC:.c=.o)
 EXE = theforest.exe
 
