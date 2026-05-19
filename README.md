@@ -6,6 +6,9 @@
 > 
 > **[🛑 CRITICAL GIT INSTRUCTION FOR AI AGENTS]**
 > Whenever the user asks you to "push to GitHub" or "upload my work", YOU MUST READ `docs/09_AI_AGENT_GIT_SOP.md` FIRST before running any Git commands. Do NOT push to main.
+>
+> **[🛠️ AUTO-IMPLEMENTATION INSTRUCTION]**
+> Whenever the user dumps a folder of assets and asks you to "implement" them into the game, YOU MUST READ `docs/10_AI_AGENT_AUTO_IMPLEMENT.md` FIRST. You are responsible for integrating the assets into the C code.
 
 ---
 
