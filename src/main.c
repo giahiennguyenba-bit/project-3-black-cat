@@ -1,6 +1,7 @@
 #include "camera.h"
 #include "game.h"
 #include "map.h"
+#include "boss.h"
 #include "raylib.h"
 #include <math.h>
 #include <stdio.h>
@@ -16,7 +17,7 @@ const char* mapFiles[] = {
     "assets/back1.tmj",
     "assets/back.tmj"
 };
-int currentMapIndex = 0;
+int currentMapIndex = 1;
 const int totalMaps = 2;
 
 int main(void) {
@@ -36,11 +37,11 @@ int main(void) {
   Player player = {0};
   InitPlayer(&player, (Vector2){100, groundY});
 
-  Texture2D texIdle = LoadTexture("FREE_Cat 2D Pixel Art/FREE_Cat 2D Pixel Art/Sprites/IDLE.png");
-  Texture2D texWalk = LoadTexture("FREE_Cat 2D Pixel Art/FREE_Cat 2D Pixel Art/Sprites/WALK.png");
-  Texture2D texRun = LoadTexture("FREE_Cat 2D Pixel Art/FREE_Cat 2D Pixel Art/Sprites/RUN.png");
-  Texture2D texJump = LoadTexture("FREE_Cat 2D Pixel Art/FREE_Cat 2D Pixel Art/Sprites/JUMP.png");
-  Texture2D texAttack = LoadTexture("FREE_Cat 2D Pixel Art/FREE_Cat 2D Pixel Art/Sprites/ATTACK 1.png");
+  Texture2D texIdle = LoadTexture("assets/cat_png/Cat-png/CAT-IDLE.png");
+  Texture2D texWalk = LoadTexture("assets/cat_png/Cat-png/CAT-WALK.png");
+  Texture2D texRun = LoadTexture("assets/cat_png/Cat-png/CAT-RUN.png");
+  Texture2D texJump = LoadTexture("assets/cat_png/Cat-png/CAT-JUMP.png");
+  Texture2D texAttack = LoadTexture("assets/cat_png/Cat-png/CAT-ATTACK.png");
   Texture2D texTiles = LoadTexture("LAMO/Final/Tiles.png");
 
   MyCamera myCam = CameraNew(player.position.x, player.position.y, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
@@ -50,6 +51,9 @@ int main(void) {
   
   // Thiết lập biên ban đầu
   CameraSetBounds(&myCam, (float)map->width * map->tilewidth, (float)map->height * map->tileheight, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+
+  Boss boss;
+  InitBoss(&boss, (Vector2){600, groundY});
 
   while (!WindowShouldClose()) {
     float dt = GetFrameTime();
@@ -80,6 +84,7 @@ int main(void) {
     }
 
     UpdatePlayer(&player, dt);
+    UpdateBoss(&boss, &player, &myCam, dt);
     
     Vector2 camTarget = { player.position.x, player.position.y - 86.0f };
     CameraUpdate(&myCam, camTarget, dt);
@@ -104,6 +109,7 @@ int main(void) {
     }
 
     DrawPlayer(&player, texIdle, texWalk, texRun, texJump, texAttack, 64, 64, 1.0f);
+    DrawBoss(&boss, 2.0f);
 
     EndMode2D();
     EndTextureMode();
@@ -114,7 +120,8 @@ int main(void) {
     Rectangle destRec = {0, 0, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT};
     DrawTexturePro(target.texture, sourceRec, destRec, (Vector2){0, 0}, 0.0f, WHITE);
     
-    DrawText(TextFormat("MAP: %s  (Press 'R' to Switch)", mapFiles[currentMapIndex]), 20, 50, 20, RAYWHITE);
+    DrawBossHP(&boss);
+    DrawText(TextFormat("MAP: %s  (Press 'R' to Switch)", mapFiles[currentMapIndex]), 20, 80, 20, RAYWHITE);
     DrawFPS(10, 10);
     EndDrawing();
   }
@@ -126,6 +133,7 @@ int main(void) {
   UnloadTexture(texAttack);
   UnloadTexture(texTiles);
   MapUnload(map);
+  UnloadBossResources();
   UnloadRenderTexture(target);
   CloseAudioDevice(); // Đóng hệ thống âm thanh
   CloseWindow();
