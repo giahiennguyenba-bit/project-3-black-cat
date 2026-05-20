@@ -13,6 +13,10 @@ static Texture2D texBossDeath[10]; // Bringer-of-Death_Death_2.png to _10.png (9
 
 // Mảng texture lưu trữ các khung hình của Spell
 static Texture2D texSpellDarkBolt[12];
+static Texture2D texSpellFireBomb[15];
+static Texture2D texSpellLightning[11];
+static Texture2D texSpellDeathSpell[16];
+static Texture2D texSpellSpark[7];
 
 // Trạng thái tài nguyên đã tải chưa
 static bool resourcesLoaded = false;
@@ -55,6 +59,26 @@ void LoadBossResources(void) {
         texSpellDarkBolt[i] = LoadTexture(TextFormat("assets/spell_png/SSPELL-PNG/DarkBolt/Dark-Bolt%d.png", i + 1));
     }
 
+    // Tải Spell FireBomb (15 frames)
+    for (int i = 0; i < 15; i++) {
+        texSpellFireBomb[i] = LoadTexture(TextFormat("assets/spell_png/SSPELL-PNG/FireBomb/Fire-bomb%d.png", i + 1));
+    }
+
+    // Tải Spell Lightning (11 frames)
+    for (int i = 0; i < 11; i++) {
+        texSpellLightning[i] = LoadTexture(TextFormat("assets/spell_png/SSPELL-PNG/Lightning/Lightning%d.png", i + 1));
+    }
+
+    // Tải Spell DeathSpell (16 frames)
+    for (int i = 0; i < 16; i++) {
+        texSpellDeathSpell[i] = LoadTexture(TextFormat("assets/spell_png/SSPELL-PNG/SPELL/Bringer-of-Death_Spell_%d.png", i + 1));
+    }
+
+    // Tải Spell Spark (7 frames)
+    for (int i = 0; i < 7; i++) {
+        texSpellSpark[i] = LoadTexture(TextFormat("assets/spell_png/SSPELL-PNG/spark/spark%d.png", i + 1));
+    }
+
     resourcesLoaded = true;
 }
 
@@ -78,15 +102,26 @@ void UnloadBossResources(void) {
     for (int i = 0; i < 12; i++) {
         UnloadTexture(texSpellDarkBolt[i]);
     }
+    for (int i = 0; i < 15; i++) {
+        UnloadTexture(texSpellFireBomb[i]);
+    }
+    for (int i = 0; i < 11; i++) {
+        UnloadTexture(texSpellLightning[i]);
+    }
+    for (int i = 0; i < 16; i++) {
+        UnloadTexture(texSpellDeathSpell[i]);
+    }
+    for (int i = 0; i < 7; i++) {
+        UnloadTexture(texSpellSpark[i]);
+    }
 
     resourcesLoaded = false;
 }
-
 void InitBoss(Boss *boss, Vector2 pos) {
     boss->position = pos;
     boss->velocity = (Vector2){0, 0};
-    boss->maxHP = 600.0f;
-    boss->currentHP = 600.0f;
+    boss->maxHP = 100.0f;
+    boss->currentHP = 100.0f;
     boss->isAlive = true;
     boss->isAttacking = false;
     boss->isCasting = false;
@@ -109,19 +144,93 @@ void InitBoss(Boss *boss, Vector2 pos) {
     boss->projectile.currentFrame = 0;
     boss->projectile.frameTimer = 0.0f;
     boss->projectile.maxFrames = 12;
+    for (int i = 0; i < 2; i++) {
+        boss->extraProjectiles[i].active = false;
+    }
+    for (int i = 0; i < 4; i++) {
+        boss->lightningStrikes[i].active = false;
+    }
+    for (int i = 0; i < 3; i++) {
+        boss->deathSpells[i].active = false;
+    }    
     
+    // Khởi tạo các biến Phase 2 Bullet Hell
+    boss->auraActive = false;
+    boss->auraTimer = 0.0f;
+    boss->auraSparkTimer = 0.0f;
+    boss->hasCheckedBehind = false;
+    boss->hasTriggeredPhase2Aura = false;
+    for (int i = 0; i < 4; i++) {
+        boss->auraSparks[i].active = false;
+    }
+
+    // Khởi tạo Rage Mode
+    boss->rageActive = false;
+    boss->rageTimer = 0.0f;
+    boss->consecutiveHits = 0;
+    boss->hitResetTimer = 0.0f;
+    boss->invincibilityTimer = 0.0f;
+
     // Tự động load resources nếu chưa có
     LoadBossResources();
 }
 
 void UpdateBoss(Boss *boss, Player *player, MyCamera *cam, float dt) {
     if (!boss->isAlive) return;
+    // DEBUG: Nhấn phím T để giảm máu boss xuống dưới 50, lập tức chuyển sang Phase 2
+    if (IsKeyPressed(KEY_T)) {
+        boss->currentHP = 49.0f;
+    }
 
+    // Xác định Phase và tự động kích hoạt Ma Thuật Hộ Thân (Chiêu 3) duy nhất một lần ở đầu Phase 2
+    if (boss->currentHP >= 50.0f) {
+        boss->currentPhase = 1;
+    } else {
+        boss->currentPhase = 2;
+        if (!boss->hasTriggeredPhase2Aura) {
+            boss->hasTriggeredPhase2Aura = true;
+            boss->auraActive = true;
+            boss->auraTimer = 5.0f; // Thời gian tồn tại của Aura là 5 giây
+            boss->auraSparkTimer = 0.0f;
+            TraceLog(LOG_INFO, "Boss triggered Aura Sparks once at the start of Phase 2!");
+        }
+    }
+    // Cập nhật Rage Mode
+    if (boss->rageActive) {
+        boss->rageTimer -= dt;
+        if (boss->rageTimer <= 0.0f) {
+            boss->rageActive = false;
+            boss->rageTimer = 0.0f;
+            TraceLog(LOG_INFO, "Boss Rage Mode ended!");
+        }
+    }
+    // Cập nhật timer reset consecutive hits
+    if (boss->hitResetTimer > 0.0f) {
+        boss->hitResetTimer -= dt;
+        if (boss->hitResetTimer <= 0.0f) {
+            boss->consecutiveHits = 0; // Reset nếu ngừng bị đánh quá lâu
+        }
+    }
+    // Cập nhật timer bất tử
+    if (boss->invincibilityTimer > 0.0f) {
+        boss->invincibilityTimer -= dt;
+    }
+    // Điều chỉnh attackCooldown dựa trên Phase và Rage
+    // Phase 1: 1.3s (Rage: 0.65s) | Phase 2: 0.875s (Rage: 0.43s)
+    if (boss->currentPhase == 1) {
+        boss->attackCooldown = boss->rageActive ? 0.65f : 1.3f;
+    } else {
+        boss->attackCooldown = boss->rageActive ? 0.43f : 0.875f; // Rage: cực kỳ dồn dập
+    }
     // Cập nhật trạng thái HURT / DEATH
     if (boss->currentHP <= 0 && boss->state != BOSS_STATE_DEATH) {
         boss->state = BOSS_STATE_DEATH;
         boss->currentFrame = 0;
         boss->frameTimer = 0.0f;
+        boss->auraActive = false;
+        for (int i = 0; i < 4; i++) {
+            boss->auraSparks[i].active = false;
+        }
     }
 
     // 1. Cập nhật hoạt ảnh và thời gian của các trạng thái đặc biệt
@@ -145,7 +254,6 @@ void UpdateBoss(Boss *boss, Player *player, MyCamera *cam, float dt) {
                 boss->currentFrame = (boss->currentFrame + 1) % maxFrames;
             }
             break;
-            
         case BOSS_STATE_ATTACK:
             maxFrames = 10;
             animSpeed = 0.08f; // Chém nhanh
@@ -158,19 +266,29 @@ void UpdateBoss(Boss *boss, Player *player, MyCamera *cam, float dt) {
                     boss->isAttacking = false;
                 }
             }
-            // Điểm chém trúng: Frame 5-7
+            // Điểm chém trúng: Frame 5-7 (Hắc Ám Hoành Tảo)
             if (boss->currentFrame >= 5 && boss->currentFrame <= 7) {
                 float dist = fabsf(boss->position.x - player->position.x);
                 float heightDiff = fabsf(boss->position.y - player->position.y);
-                if (dist < 110.0f && heightDiff < 50.0f) {
+                
+                // Chỉ trúng đòn khi đứng trước mặt Boss (Directional Hitbox)
+                bool inFront = (boss->facingRight && player->position.x >= boss->position.x) || 
+                               (!boss->facingRight && player->position.x <= boss->position.x);
+                
+                if (dist < 160.0f && heightDiff < 60.0f && inFront) {
                     // Người chơi bị dính đòn cận chiến!
                     if (player->freezeTimer <= 0) {
-                        player->freezeTimer = 0.25f;
-                        // Đẩy nhẹ player ra sau
+                        player->freezeTimer = 0.45f;
+                        player->currentHP -= 1.0f;
+                            player->isHurt = true;
+                            player->currentFrame = 0;
+                            player->frameTimer = 0.0f;
+                            player->freezeTimer = 0.2f; // Mất 1 máu
+                        // Đẩy mạnh player ra sau (120px) để tạo cảm giác chấn động mạnh
                         float pushDir = (player->position.x > boss->position.x) ? 1.0f : -1.0f;
-                        player->position.x += pushDir * 30.0f;
-                        CameraShake(cam, 0.3f, 8.0f); // Rung lắc màn hình khi player bị chém
-                        TraceLog(LOG_INFO, "Player hit by Boss Melee!");
+                        player->position.x += pushDir * 120.0f;
+                        CameraShake(cam, 0.35f, 10.0f); // Rung lắc màn hình mạnh hơn
+                        TraceLog(LOG_INFO, "Player hit by Boss Melee (Hac Am Hoanh Tao)! Player HP: %.1f", player->currentHP);
                     }
                 }
             }
@@ -183,14 +301,81 @@ void UpdateBoss(Boss *boss, Player *player, MyCamera *cam, float dt) {
                 boss->frameTimer = 0;
                 boss->currentFrame++;
                 
-                // Ở frame thứ 5, bắn ra DarkBolt
+                // Ở frame thứ 5, bắt đầu kích hoạt chiêu thức phép tương ứng
                 if (boss->currentFrame == 5 && !boss->projectile.active) {
                     boss->projectile.active = true;
-                    boss->projectile.position = (Vector2){ boss->position.x + (boss->facingRight ? 50 : -50), boss->position.y - 45 };
-                    float dir = boss->facingRight ? 1.0f : -1.0f;
-                    boss->projectile.velocity = (Vector2){ dir * 450.0f, 0.0f };
+                    boss->projectile.type = (SpellType)boss->attackPattern;
+                    boss->projectile.state = 0;
+                    boss->projectile.stateTimer = 0.0f;
                     boss->projectile.currentFrame = 0;
                     boss->projectile.frameTimer = 0.0f;
+                    
+                    float dir = boss->facingRight ? 1.0f : -1.0f;
+                    
+                    if (boss->projectile.type == SPELL_DARK_BOLT) {
+                        boss->projectile.position = (Vector2){ boss->position.x + (boss->facingRight ? 50.0f : -50.0f), boss->position.y - 45.0f };
+                        boss->projectile.velocity = (Vector2){ dir * 700.0f, 0.0f }; // Tăng tốc độ bay từ 450 lên 700
+                        boss->projectile.radius = 20.0f;
+                        boss->projectile.damage = 15.0f;
+                        boss->projectile.maxFrames = 12;
+                    }
+                    else if (boss->projectile.type == SPELL_FIRE_BOMB) {
+                        // Cast trực tiếp dưới chân người chơi trên mặt đất (groundY)
+                        boss->projectile.position = (Vector2){ player->position.x, player->groundY };
+                        boss->projectile.velocity = (Vector2){ 0.0f, 0.0f };
+                        boss->projectile.targetPos = player->position;
+                        // Tăng bán kính 15% ở Phase 1 (50.0f * 1.15 = 57.5f) và 20% ở Phase 2 (50.0f * 1.2 = 60.0f)
+                        boss->projectile.radius = (boss->currentPhase == 2) ? 60.0f : 57.5f;
+                        boss->projectile.damage = 25.0f;
+                        boss->projectile.maxFrames = 15; // 15 frames của Fire-bomb
+                        boss->projectile.state = 1;      // Bỏ qua state 0 (ma thuật tím cảnh báo), vào thẳng bùng nổ
+                    }
+                    else if (boss->projectile.type == SPELL_LIGHTNING) {
+                        // Kích hoạt 4 tia sét giáng xuống đồng thời làm Thiên Lôi Phạt!
+                        // Bố trí quanh vị trí người chơi hiện tại: -240px, -80px, +80px, +240px
+                        float offsets[4] = { -240.0f, -80.0f, 80.0f, 240.0f };
+                        for (int i = 0; i < 4; i++) {
+                            float randomOffset = (float)GetRandomValue(-15, 15);
+                            boss->lightningStrikes[i].active = true;
+                            boss->lightningStrikes[i].type = SPELL_LIGHTNING;
+                            boss->lightningStrikes[i].state = 0; // Cảnh báo Telegraph
+                            boss->lightningStrikes[i].stateTimer = 0.0f;
+                            boss->lightningStrikes[i].position = (Vector2){ player->position.x + offsets[i] + randomOffset, player->groundY };
+                            boss->lightningStrikes[i].radius = 30.0f; // Bức tường sét rộng 60px
+                            boss->lightningStrikes[i].damage = 20.0f;
+                            boss->lightningStrikes[i].maxFrames = 11;
+                            boss->lightningStrikes[i].currentFrame = 0;
+                            boss->lightningStrikes[i].frameTimer = 0.0f;
+                        }
+                        // Vô hiệu hóa đạn chính để tránh trùng lặp
+                        boss->projectile.active = false;
+                    }
+                    else if (boss->projectile.type == SPELL_DEATH_SPELL) {
+                        // X theo vị trí Player, Y dưới chân mèo
+                        boss->projectile.position = (Vector2){ player->position.x, player->groundY };
+                        boss->projectile.velocity = (Vector2){ 0, 0 };
+                        boss->projectile.radius = 45.0f;
+                        boss->projectile.damage = 35.0f;
+                        boss->projectile.maxFrames = 16;
+                        
+                        if (boss->currentPhase == 3) {
+                            // Kích hoạt thêm 2 cột phép phụ hai bên
+                            for (int i = 0; i < 2; i++) {
+                                boss->deathSpells[i].active = true;
+                                boss->deathSpells[i].type = SPELL_DEATH_SPELL;
+                                boss->deathSpells[i].state = 0;
+                                boss->deathSpells[i].stateTimer = 0.0f;
+                                float offset = (i == 0) ? -120.0f : 120.0f;
+                                boss->deathSpells[i].position = (Vector2){ player->position.x + offset, player->groundY }; // Đặt dưới chân giống cột chính
+                                boss->deathSpells[i].velocity = (Vector2){ 0, 0 };
+                                boss->deathSpells[i].radius = 40.0f;
+                                boss->deathSpells[i].damage = 25.0f;
+                                boss->deathSpells[i].maxFrames = 16;
+                                boss->deathSpells[i].currentFrame = 0;
+                                boss->deathSpells[i].frameTimer = 0.0f;
+                            }
+                        }
+                    }
                 }
                 
                 if (boss->currentFrame >= maxFrames) {
@@ -237,16 +422,46 @@ void UpdateBoss(Boss *boss, Player *player, MyCamera *cam, float dt) {
         float distToPlayer = player->position.x - boss->position.x;
         float distAbs = fabsf(distToPlayer);
 
-        boss->attackTimer += dt;
+        // Ngưỡng khoảng cách bắt đầu cast phép: Phase 1 (125.0f), Phase 2 chỉ thấp hơn một chút (110.0f)
+        float castThreshold = (boss->currentPhase == 2) ? 110.0f : 125.0f;
 
-        if (distAbs > 250.0f) {
-            // Player ở quá xa -> Đi lại gần
-            boss->state = BOSS_STATE_WALK;
-            float moveDir = (distToPlayer > 0) ? 1.0f : -1.0f;
-            boss->velocity.x = moveDir * 100.0f;
-            boss->position.x += boss->velocity.x * dt;
-        } else if (distAbs < 80.0f) {
-            // Player ở quá gần -> Lùi lại một chút hoặc chém cận chiến ngay
+        boss->attackTimer += dt;
+        if (distAbs > castThreshold) {
+            // Player ở xa ngưỡng -> Lập tức cast phép ép tiếp cận
+            if (boss->attackTimer >= boss->attackCooldown) {
+                boss->attackTimer = 0;
+                boss->state = BOSS_STATE_CAST;
+                boss->isCasting = true;
+                boss->velocity.x = 0;
+                boss->currentFrame = 0;
+                boss->frameTimer = 0;
+                
+                if (boss->currentPhase == 1) {
+                    // Phase 1: FireBomb 30%, DarkBolt 20%, Lightning 20%, DeathSpell (SPELL) 30%
+                    int roll = GetRandomValue(0, 99);
+                    if (roll < 30)       boss->attackPattern = SPELL_FIRE_BOMB;    // 30%
+                    else if (roll < 50)  boss->attackPattern = SPELL_DARK_BOLT;    // 20%
+                    else if (roll < 70)  boss->attackPattern = SPELL_LIGHTNING;    // 20%
+                    else                 boss->attackPattern = SPELL_DEATH_SPELL;  // 30% (tăng từ 15%)
+                } else {
+                    // Phase 2: FireBomb 20%, DarkBolt 20%, Lightning 20%, DeathSpell (SPELL) 40%
+                    int roll = GetRandomValue(0, 99);
+                    if (roll < 20)       boss->attackPattern = SPELL_FIRE_BOMB;    // 20%
+                    else if (roll < 40)  boss->attackPattern = SPELL_DARK_BOLT;    // 20%
+                    else if (roll < 60)  boss->attackPattern = SPELL_LIGHTNING;    // 20%
+                    else                 boss->attackPattern = SPELL_DEATH_SPELL;  // 40% (tăng từ 25%)
+                }
+            } else {
+                // Đang trong thời gian hồi chiêu -> Đi bộ lại gần player
+                boss->state = BOSS_STATE_WALK;
+                float moveDir = (distToPlayer > 0) ? 1.0f : -1.0f;
+                float walkSpeed = (boss->currentPhase == 2) ? 185.0f : 180.0f;
+                if (boss->rageActive) walkSpeed *= 1.15f;
+                boss->velocity.x = moveDir * walkSpeed;
+                boss->position.x += boss->velocity.x * dt;
+            }
+        } else if (distAbs < 130.0f) {
+            // Player ở quá gần -> Đập kiếm chém (Chiêu 1)
             if (boss->attackTimer >= boss->attackCooldown) {
                 boss->state = BOSS_STATE_ATTACK;
                 boss->currentFrame = 0;
@@ -254,60 +469,428 @@ void UpdateBoss(Boss *boss, Player *player, MyCamera *cam, float dt) {
                 boss->attackTimer = 0;
                 boss->isAttacking = true;
                 boss->velocity.x = 0;
+                boss->hasCheckedBehind = false; // Reset kiểm tra né sau lưng
             } else {
-                boss->state = BOSS_STATE_IDLE;
-                boss->velocity.x = 0;
+                // Đang trong thời gian hồi chiêu nhưng ở gần -> TIẾP TỤC ĐI BỘ VỀ PHÍA PLAYER để ép góc
+                boss->state = BOSS_STATE_WALK;
+                float moveDir = (distToPlayer > 0) ? 1.0f : -1.0f;
+                float walkSpeed = (boss->currentPhase == 2) ? 185.0f : 180.0f;
+                if (boss->rageActive) walkSpeed *= 1.15f;
+                boss->velocity.x = moveDir * walkSpeed;
+                boss->position.x += boss->velocity.x * dt;
             }
         } else {
-            // Player ở khoảng giữa -> IDLE hoặc dùng CAST phép từ xa
-            boss->state = BOSS_STATE_IDLE;
-            boss->velocity.x = 0;
+            // Player ở khoảng giữa -> Đi bộ tiếp cận
+            boss->state = BOSS_STATE_WALK;
+            float moveDir = (distToPlayer > 0) ? 1.0f : -1.0f;
+            float walkSpeed = (boss->currentPhase == 2) ? 185.0f : 180.0f;
+            if (boss->rageActive) walkSpeed *= 1.15f;
+            boss->velocity.x = moveDir * walkSpeed;
+            boss->position.x += boss->velocity.x * dt;
+        }
+    }
 
-            if (boss->attackTimer >= boss->attackCooldown) {
-                // Tùy biến đòn đánh theo Phase
-                boss->attackTimer = 0;
-                if (GetRandomValue(0, 10) > 4) {
-                    boss->state = BOSS_STATE_CAST;
-                    boss->isCasting = true;
-                } else {
-                    boss->state = BOSS_STATE_ATTACK;
-                    boss->isAttacking = true;
+    // 3. Cập nhật Projectile / Spells
+    if (boss->projectile.active) {
+        boss->projectile.frameTimer += dt;
+        
+        if (boss->projectile.type == SPELL_DARK_BOLT) {
+            boss->projectile.position.x += boss->projectile.velocity.x * dt;
+            boss->projectile.position.y += boss->projectile.velocity.y * dt;
+            
+            if (boss->projectile.frameTimer >= 0.08f) {
+                boss->projectile.frameTimer = 0.0f;
+                boss->projectile.currentFrame = (boss->projectile.currentFrame + 1) % boss->projectile.maxFrames;
+            }
+
+            if (fabsf(boss->projectile.position.x - boss->position.x) > 1200.0f) {
+                boss->projectile.active = false;
+            }
+
+            float distToPlayer = Vector2Distance(boss->projectile.position, (Vector2){ player->position.x, player->position.y - 32.0f });
+            if (distToPlayer < (boss->projectile.radius + 20.0f)) {
+                boss->projectile.active = false;
+                if (player->freezeTimer <= 0) {
+                    player->freezeTimer = 0.3f;
+                    player->currentHP -= 1.0f;
+                            player->isHurt = true;
+                            player->currentFrame = 0;
+                            player->frameTimer = 0.0f;
+                            player->freezeTimer = 0.2f; // Mất 1 máu
+                    float pushDir = (boss->projectile.velocity.x > 0) ? 1.0f : -1.0f;
+                    player->position.x += pushDir * 40.0f;
+                    CameraShake(cam, 0.25f, 6.0f);
+                    TraceLog(LOG_INFO, "Player hit by Boss DarkBolt spell! Player HP: %.1f", player->currentHP);
                 }
-                boss->currentFrame = 0;
-                boss->frameTimer = 0;
+            }
+        }
+        else if (boss->projectile.type == SPELL_FIRE_BOMB) {
+            if (boss->projectile.state == 0) { // Giai đoạn cảnh báo Telegraph (16 frames * 0.075s = 1.2 giây)
+                if (boss->projectile.frameTimer >= 0.075f) {
+                    boss->projectile.frameTimer = 0.0f;
+                    boss->projectile.currentFrame++;
+                    if (boss->projectile.currentFrame >= boss->projectile.maxFrames) {
+                        // Chuyển sang State 1 (Bùng nổ)
+                        boss->projectile.state = 1;
+                        boss->projectile.currentFrame = 0;
+                        boss->projectile.frameTimer = 0.0f;
+                        boss->projectile.maxFrames = 15; // 15 frames của Fire-bomb
+                        
+                        if (boss->currentPhase == 3) {
+                            // Kích hoạt 2 đạn extraProjectiles bay sang trái và phải phân tách từ FireBomb
+                            for (int i = 0; i < 2; i++) {
+                                boss->extraProjectiles[i].active = true;
+                                boss->extraProjectiles[i].type = SPELL_DARK_BOLT;
+                                boss->extraProjectiles[i].position = boss->projectile.position;
+                                boss->extraProjectiles[i].velocity = (Vector2){ (i == 0 ? -350.0f : 350.0f), 0.0f };
+                                boss->extraProjectiles[i].radius = 15.0f;
+                                boss->extraProjectiles[i].damage = 10.0f;
+                                boss->extraProjectiles[i].maxFrames = 12;
+                                boss->extraProjectiles[i].currentFrame = 0;
+                                boss->extraProjectiles[i].frameTimer = 0.0f;
+                            }
+                        }
+                    }
+                }
+            }
+            else { // Giai đoạn bùng nổ cột lửa
+                if (boss->projectile.frameTimer >= 0.07f) {
+                    boss->projectile.frameTimer = 0.0f;
+                    boss->projectile.currentFrame++;
+                    if (boss->projectile.currentFrame >= boss->projectile.maxFrames) {
+                        boss->projectile.active = false;
+                    }
+                }
+                
+                // Gây sát thương ở các frame vụ nổ mạnh nhất (frame 5-11)
+                if (boss->projectile.currentFrame >= 5 && boss->projectile.currentFrame <= 11) {
+                    float distH = fabsf(player->position.x - boss->projectile.position.x);
+                    float distV = fabsf(player->position.y - boss->projectile.position.y);
+                    
+                    // Hitbox: bán kính ngang 50px (đường kính 100px), chiều cao cột lửa 80px
+                    if (distH < boss->projectile.radius && distV < 80.0f) {
+                        if (player->freezeTimer <= 0) {
+                            player->freezeTimer = 0.45f; // Khựng mạnh
+                            player->currentHP -= 1.0f;
+                            player->isHurt = true;
+                            player->currentFrame = 0;
+                            player->frameTimer = 0.0f;
+                            player->freezeTimer = 0.2f; // Mất 1 máu
+                            float pushDir = (player->position.x > boss->projectile.position.x) ? 1.0f : -1.0f;
+                            player->position.x += pushDir * 80.0f; // Bị đẩy lùi mạnh
+                            CameraShake(cam, 0.35f, 9.0f);
+                            TraceLog(LOG_INFO, "Player hit by Boss Ground FireBomb explosion! Player HP: %.1f", player->currentHP);
+                        }
+                    }
+                }
+            }
+        }
+        else if (boss->projectile.type == SPELL_LIGHTNING) {
+            boss->projectile.stateTimer += dt;
+            if (boss->projectile.state == 0) { // Cảnh báo sét đánh (nhanh hơn: 0.25s)
+                if (boss->projectile.stateTimer >= 0.25f) {
+                    boss->projectile.state = 1;
+                    boss->projectile.stateTimer = 0.0f;
+                    boss->projectile.currentFrame = 0;
+                    boss->projectile.frameTimer = 0.0f;
+                }
+            }
+            else { // Sét đánh xuống
+                if (boss->projectile.frameTimer >= 0.06f) {
+                    boss->projectile.frameTimer = 0.0f;
+                    boss->projectile.currentFrame++;
+                    if (boss->projectile.currentFrame >= boss->projectile.maxFrames) {
+                        boss->projectile.active = false;
+                        
+                        // Khi sét 1 biến mất, luôn kích hoạt sét 2 khóa theo vị trí mới của Player!
+                        boss->lightningStrikes[0].active = true;
+                        boss->lightningStrikes[0].type = SPELL_LIGHTNING;
+                        boss->lightningStrikes[0].state = 0; // Cảnh báo sét 2
+                        boss->lightningStrikes[0].stateTimer = 0.0f;
+                        boss->lightningStrikes[0].position = (Vector2){ player->position.x, player->position.y };
+                        boss->lightningStrikes[0].radius = 30.0f;
+                        boss->lightningStrikes[0].damage = 20.0f;
+                        boss->lightningStrikes[0].maxFrames = 11;
+                        boss->lightningStrikes[0].currentFrame = 0;
+                        boss->lightningStrikes[0].frameTimer = 0.0f;
+                    }
+                }
+                
+                // Gây dam ở frame 2-6
+                if (boss->projectile.currentFrame >= 2 && boss->projectile.currentFrame <= 6) {
+                    float distToPlayerX = fabsf(player->position.x - boss->projectile.position.x);
+                    if (distToPlayerX < boss->projectile.radius) {
+                        if (player->freezeTimer <= 0) {
+                            player->freezeTimer = 0.4f;
+                            player->currentHP -= 1.0f;
+                            player->isHurt = true;
+                            player->currentFrame = 0;
+                            player->frameTimer = 0.0f;
+                            player->freezeTimer = 0.2f; // Mất 1 máu
+                            CameraShake(cam, 0.4f, 12.0f);
+                            TraceLog(LOG_INFO, "Player hit by Boss Lightning! Player HP: %.1f", player->currentHP);
+                        }
+                    }
+                }
+            }
+        }
+        else if (boss->projectile.type == SPELL_DEATH_SPELL) {
+            boss->projectile.stateTimer += dt;
+            if (boss->projectile.state == 0) { // Cảnh báo
+                if (boss->projectile.stateTimer >= 0.6f) {
+                    boss->projectile.state = 1;
+                    boss->projectile.stateTimer = 0.0f;
+                    boss->projectile.currentFrame = 0;
+                    boss->projectile.frameTimer = 0.0f;
+                }
+            }
+            else { // Phun trào (tốc độ x2: 0.07 → 0.035)
+                if (boss->projectile.frameTimer >= 0.035f) {
+                    boss->projectile.frameTimer = 0.0f;
+                    boss->projectile.currentFrame++;
+                    if (boss->projectile.currentFrame >= boss->projectile.maxFrames) {
+                        boss->projectile.active = false;
+                    }
+                }
+                
+                // Gây dam từ frame 4-12
+                if (boss->projectile.currentFrame >= 4 && boss->projectile.currentFrame <= 12) {
+                    float distToPlayerX = fabsf(player->position.x - boss->projectile.position.x);
+                    if (distToPlayerX < boss->projectile.radius) {
+                        if (player->freezeTimer <= 0) {
+                            player->freezeTimer = 0.3f;
+                            player->currentHP -= 1.0f;
+                            player->isHurt = true;
+                            player->currentFrame = 0;
+                            player->frameTimer = 0.0f;
+                            player->freezeTimer = 0.2f; // Mất 1 máu
+                            CameraShake(cam, 0.3f, 8.0f);
+                            TraceLog(LOG_INFO, "Player hit by Boss DeathSpell! Player HP: %.1f", player->currentHP);
+                        }
+                    }
+                }
             }
         }
     }
 
-    // 3. Cập nhật Projectile (DarkBolt phép thuật)
-    if (boss->projectile.active) {
-        boss->projectile.position.x += boss->projectile.velocity.x * dt;
-        boss->projectile.position.y += boss->projectile.velocity.y * dt;
-        
-        // Hoạt ảnh Projectile
-        boss->projectile.frameTimer += dt;
-        if (boss->projectile.frameTimer >= 0.08f) {
-            boss->projectile.frameTimer = 0.0f;
-            boss->projectile.currentFrame = (boss->projectile.currentFrame + 1) % boss->projectile.maxFrames;
-        }
-
-        // Tự hủy nếu bay quá xa khỏi tầm nhìn
-        if (fabsf(boss->projectile.position.x - boss->position.x) > 1200.0f) {
-            boss->projectile.active = false;
-        }
-
-        // Kiểm tra va chạm với Player
-        float distToPlayer = Vector2Distance(boss->projectile.position, (Vector2){ player->position.x, player->position.y - 32.0f });
-        if (distToPlayer < (boss->projectile.radius + 20.0f)) {
-            boss->projectile.active = false;
+    // 3.1. Cập nhật extraProjectiles (Đạn phân mảnh từ FireBomb)
+    for (int i = 0; i < 2; i++) {
+        if (boss->extraProjectiles[i].active) {
+            boss->extraProjectiles[i].position.x += boss->extraProjectiles[i].velocity.x * dt;
+            boss->extraProjectiles[i].position.y += boss->extraProjectiles[i].velocity.y * dt;
             
-            // Làm cho player bị đóng băng/đẩy lùi
-            if (player->freezeTimer <= 0) {
-                player->freezeTimer = 0.3f;
-                float pushDir = (boss->projectile.velocity.x > 0) ? 1.0f : -1.0f;
-                player->position.x += pushDir * 40.0f;
-                CameraShake(cam, 0.25f, 6.0f); // Rung lắc khi spell bắn trúng player
-                TraceLog(LOG_INFO, "Player hit by Boss DarkBolt spell!");
+            boss->extraProjectiles[i].frameTimer += dt;
+            if (boss->extraProjectiles[i].frameTimer >= 0.08f) {
+                boss->extraProjectiles[i].frameTimer = 0.0f;
+                boss->extraProjectiles[i].currentFrame = (boss->extraProjectiles[i].currentFrame + 1) % boss->extraProjectiles[i].maxFrames;
+            }
+            
+            // Tự hủy nếu bay quá xa khỏi vị trí ban đầu của Boss
+            if (fabsf(boss->extraProjectiles[i].position.x - boss->position.x) > 1200.0f) {
+                boss->extraProjectiles[i].active = false;
+            }
+            
+            // Va chạm với Player
+            float distToPlayer = Vector2Distance(boss->extraProjectiles[i].position, (Vector2){ player->position.x, player->position.y - 32.0f });
+            if (distToPlayer < (boss->extraProjectiles[i].radius + 20.0f)) {
+                boss->extraProjectiles[i].active = false;
+                if (player->freezeTimer <= 0) {
+                    player->freezeTimer = 0.25f;
+                    player->currentHP -= 1.0f;
+                            player->isHurt = true;
+                            player->currentFrame = 0;
+                            player->frameTimer = 0.0f;
+                            player->freezeTimer = 0.2f; // Mất 1 máu
+                    float pushDir = (boss->extraProjectiles[i].velocity.x > 0) ? 1.0f : -1.0f;
+                    player->position.x += pushDir * 30.0f;
+                    CameraShake(cam, 0.2f, 4.0f);
+                    TraceLog(LOG_INFO, "Player hit by Boss split DarkBolt! Player HP: %.1f", player->currentHP);
+                }
+            }
+        }
+    }
+    
+    // 3.2. Cập nhật mảng lightningStrikes (Các tia sét đánh đồng loạt - Thiên Lôi Phạt)
+    for (int i = 0; i < 4; i++) {
+        if (boss->lightningStrikes[i].active) {
+            boss->lightningStrikes[i].stateTimer += dt;
+            
+            // Cảnh báo (Telegraph) kéo dài 0.8 giây
+            if (boss->lightningStrikes[i].state == 0) {
+                if (boss->lightningStrikes[i].stateTimer >= 0.8f) {
+                    boss->lightningStrikes[i].state = 1;
+                    boss->lightningStrikes[i].stateTimer = 0.0f;
+                    boss->lightningStrikes[i].currentFrame = 0;
+                    boss->lightningStrikes[i].frameTimer = 0.0f;
+                }
+            }
+            else { // Sét đánh xuống
+                boss->lightningStrikes[i].frameTimer += dt;
+                if (boss->lightningStrikes[i].frameTimer >= 0.06f) {
+                    boss->lightningStrikes[i].frameTimer = 0.0f;
+                    boss->lightningStrikes[i].currentFrame++;
+                    if (boss->lightningStrikes[i].currentFrame >= boss->lightningStrikes[i].maxFrames) {
+                        boss->lightningStrikes[i].active = false;
+                    }
+                }
+                
+                // Va chạm sét với Player (Bức tường dọc chịu sát thương mọi độ cao)
+                if (boss->lightningStrikes[i].currentFrame >= 2 && boss->lightningStrikes[i].currentFrame <= 8) {
+                    float distH = fabsf(player->position.x - boss->lightningStrikes[i].position.x);
+                    if (distH < boss->lightningStrikes[i].radius) {
+                        if (player->freezeTimer <= 0) {
+                            player->freezeTimer = 0.45f;
+                            player->currentHP -= 1.0f;
+                            player->isHurt = true;
+                            player->currentFrame = 0;
+                            player->frameTimer = 0.0f;
+                            player->freezeTimer = 0.2f; // Mất 1 máu
+                            float pushDir = (player->position.x > boss->lightningStrikes[i].position.x) ? 1.0f : -1.0f;
+                            player->position.x += pushDir * 50.0f; // Bị giật đẩy lùi
+                            CameraShake(cam, 0.35f, 10.0f);
+                            TraceLog(LOG_INFO, "Player hit by Boss Lightning Rain! Player HP: %.1f", player->currentHP);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3.2.1. Cập nhật Ma Thuật Hộ Thân (Chiêu 3) và các tia đạn bám đuổi (Spark)
+    if (boss->auraActive) {
+        boss->auraTimer -= dt;
+        if (boss->auraTimer <= 0.0f) {
+            boss->auraActive = false;
+        }
+    }
+
+    if (boss->auraActive) {
+        
+        // Mỗi 1.25 giây bắn một tia đạn bám đuổi (sparks)
+        boss->auraSparkTimer += dt;
+        if (boss->auraSparkTimer >= 1.25f) {
+            boss->auraSparkTimer = 0.0f;
+            
+            // Đếm số lượng đạn sparks đang kích hoạt
+            int activeCount = 0;
+            for (int i = 0; i < 4; i++) {
+                if (boss->auraSparks[i].active) activeCount++;
+            }
+
+            if (activeCount < 2) {
+                // Tìm slot trống trong mảng auraSparks
+                for (int i = 0; i < 4; i++) {
+                    if (!boss->auraSparks[i].active) {
+                        boss->auraSparks[i].active = true;
+                        boss->auraSparks[i].type = SPELL_DARK_BOLT;
+                        // Bắn ra từ tâm Boss
+                        boss->auraSparks[i].position = (Vector2){ boss->position.x, boss->position.y - 30.0f };
+                        
+                        Vector2 target = { player->position.x, player->position.y - 32.0f };
+                        Vector2 diff = Vector2Subtract(target, boss->auraSparks[i].position);
+                        Vector2 dir = Vector2Normalize(diff);
+                        float speed = 80.0f; // Giảm tốc độ từ 120.0f xuống 80.0f
+                        boss->auraSparks[i].velocity = (Vector2){ dir.x * speed, dir.y * speed };
+                        boss->auraSparks[i].radius = 15.0f;
+                        boss->auraSparks[i].damage = 10.0f;
+                        boss->auraSparks[i].maxFrames = 7; // spark có 7 frames hoạt ảnh
+                        boss->auraSparks[i].currentFrame = 0;
+                        boss->auraSparks[i].frameTimer = 0.0f;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Cập nhật các đạn bám đuôi auraSparks
+    for (int i = 0; i < 4; i++) {
+        if (boss->auraSparks[i].active) {
+            // Homing/Steering logic: xoay chuyển từ từ hướng về người chơi
+            Vector2 target = { player->position.x, player->position.y - 32.0f };
+            Vector2 diff = Vector2Subtract(target, boss->auraSparks[i].position);
+            float dist = Vector2Length(diff);
+            if (dist > 5.0f) {
+                Vector2 dir = Vector2Normalize(diff);
+                float speed = 80.0f; // Giảm tốc độ homing từ 180.0f xuống 80.0f
+                boss->auraSparks[i].velocity.x = Lerp(boss->auraSparks[i].velocity.x, dir.x * speed, 3.0f * dt);
+                boss->auraSparks[i].velocity.y = Lerp(boss->auraSparks[i].velocity.y, dir.y * speed, 3.0f * dt);
+            }
+            
+            // Di chuyển đạn
+            boss->auraSparks[i].position.x += boss->auraSparks[i].velocity.x * dt;
+            boss->auraSparks[i].position.y += boss->auraSparks[i].velocity.y * dt;
+            
+            // Cập nhật hoạt ảnh
+            boss->auraSparks[i].frameTimer += dt;
+            if (boss->auraSparks[i].frameTimer >= 0.08f) {
+                boss->auraSparks[i].frameTimer = 0.0f;
+                boss->auraSparks[i].currentFrame = (boss->auraSparks[i].currentFrame + 1) % boss->auraSparks[i].maxFrames;
+            }
+            
+            // Tự hủy nếu bay quá xa khỏi biên đấu trường
+            if (boss->auraSparks[i].position.x < 0.0f || boss->auraSparks[i].position.x > 2500.0f) {
+                boss->auraSparks[i].active = false;
+            }
+            
+            // Va chạm với Player
+            float distToPlayer = Vector2Distance(boss->auraSparks[i].position, (Vector2){ player->position.x, player->position.y - 32.0f });
+            if (distToPlayer < (boss->auraSparks[i].radius + 20.0f)) {
+                boss->auraSparks[i].active = false;
+                if (player->freezeTimer <= 0) {
+                    player->freezeTimer = 0.25f;
+                    player->currentHP -= 1.0f;
+                            player->isHurt = true;
+                            player->currentFrame = 0;
+                            player->frameTimer = 0.0f;
+                            player->freezeTimer = 0.2f; // Mất 1 máu
+                    float pushDir = (boss->auraSparks[i].velocity.x > 0) ? 1.0f : -1.0f;
+                    player->position.x += pushDir * 35.0f;
+                    CameraShake(cam, 0.2f, 5.0f);
+                    TraceLog(LOG_INFO, "Player hit by Boss Spark (Homing DarkBolt)! Player HP: %.1f", player->currentHP);
+                }
+            }
+        }
+    }
+
+    // 3.3. Cập nhật deathSpells[0] và deathSpells[1] (Hai cột phép phụ hai bên ở Phase 3)
+    for (int i = 0; i < 2; i++) {
+        if (boss->deathSpells[i].active) {
+            boss->deathSpells[i].stateTimer += dt;
+            if (boss->deathSpells[i].state == 0) { // Cảnh báo
+                if (boss->deathSpells[i].stateTimer >= 0.6f) {
+                    boss->deathSpells[i].state = 1;
+                    boss->deathSpells[i].stateTimer = 0.0f;
+                    boss->deathSpells[i].currentFrame = 0;
+                    boss->deathSpells[i].frameTimer = 0.0f;
+                }
+            }
+            else { // Phun trào
+                boss->deathSpells[i].frameTimer += dt;
+                if (boss->deathSpells[i].frameTimer >= 0.07f) {
+                    boss->deathSpells[i].frameTimer = 0.0f;
+                    boss->deathSpells[i].currentFrame++;
+                    if (boss->deathSpells[i].currentFrame >= boss->deathSpells[i].maxFrames) {
+                        boss->deathSpells[i].active = false;
+                    }
+                }
+                
+                // Va chạm
+                if (boss->deathSpells[i].currentFrame >= 4 && boss->deathSpells[i].currentFrame <= 12) {
+                    float distToPlayerX = fabsf(player->position.x - boss->deathSpells[i].position.x);
+                    if (distToPlayerX < boss->deathSpells[i].radius) {
+                        if (player->freezeTimer <= 0) {
+                            player->freezeTimer = 0.3f;
+                            player->currentHP -= 1.0f;
+                            player->isHurt = true;
+                            player->currentFrame = 0;
+                            player->frameTimer = 0.0f;
+                            player->freezeTimer = 0.2f; // Mất 1 máu
+                            CameraShake(cam, 0.25f, 6.0f);
+                            TraceLog(LOG_INFO, "Player hit by Boss extra DeathSpell column! Player HP: %.1f", player->currentHP);
+                        }
+                    }
+                }
             }
         }
     }
@@ -321,24 +904,67 @@ void UpdateBoss(Boss *boss, Player *player, MyCamera *cam, float dt) {
         // Kiểm tra xem player có quay mặt đúng hướng boss không
         bool correctDirection = (player->facingRight && distToBoss < 0) || (!player->facingRight && distToBoss > 0);
 
-        if (distAbs < attackDist && correctDirection && boss->state != BOSS_STATE_HURT && boss->state != BOSS_STATE_DEATH) {
-            // Boss bị dính đòn của player!
-            boss->currentHP -= 15.0f;
+        if (distAbs < attackDist && correctDirection && boss->state != BOSS_STATE_HURT && boss->state != BOSS_STATE_DEATH && boss->invincibilityTimer <= 0.0f) {
+            // Boss luôn nhận sát thương khi bị chém trúng
+            boss->currentHP -= 2.0f; // DMG của mèo là 2 dmg
             if (boss->currentHP < 0) boss->currentHP = 0;
-            
-            boss->state = BOSS_STATE_HURT;
-            boss->currentFrame = 0;
-            boss->frameTimer = 0.0f;
-            boss->isHurt = true;
-            
-            // Knocks back slightly
-            float kb = (player->facingRight) ? -15.0f : 15.0f;
-            boss->position.x += kb;
-            
+            boss->invincibilityTimer = 0.5f; // Bất tử trong 0.5 giây sau khi dính đòn
+
+            // Track consecutive hits trong Phase 2 để kích hoạt Rage
+            if (boss->currentPhase == 2 && !boss->rageActive) {
+                boss->consecutiveHits++;
+                boss->hitResetTimer = 3.0f; // Nếu không bị đánh trong 3 giây thì reset
+                if (boss->consecutiveHits >= 3) {
+                    boss->rageActive = true;
+                    boss->rageTimer = 5.0f;
+                    boss->consecutiveHits = 0;
+                    TraceLog(LOG_INFO, "Boss entered RAGE MODE after 3 consecutive hits!");
+                }
+            }
+
+            // Chỉ interrupt sang HURT nếu Boss KHÔNG đang tấn công/cast
+            // (Animation ATTACK và CAST không thể bị cancel)
+            if (boss->state != BOSS_STATE_ATTACK && boss->state != BOSS_STATE_CAST) {
+                boss->state = BOSS_STATE_HURT;
+                boss->currentFrame = 0;
+                boss->frameTimer = 0.0f;
+                boss->isHurt = true;
+                // Đẩy lùi boss ra xa (Knockback away from player)
+                float kb = (player->facingRight) ? 30.0f : -30.0f;
+                boss->position.x += kb;
+            }
             CameraShake(cam, 0.2f, 5.0f); // Rung lắc khi chém trúng Boss
-            TraceLog(LOG_INFO, "Boss hit by Player! Current HP: %.1f", boss->currentHP);
+            TraceLog(LOG_INFO, "Boss hit by Player! Current HP: %.1f (Consecutive: %d)", boss->currentHP, boss->consecutiveHits);
         }
     }
+
+    // 5. Solid Body Collision: Mèo không thể đi xuyên qua Boss
+    {
+        float minSep = 28.3f; // Khoảng cách tối thiểu giảm xuống còn 1/3 (85/3) để Mèo dễ chém trúng
+        float dx = player->position.x - boss->position.x;
+        float absDx = fabsf(dx);
+
+        // "Nhảy qua đầu Boss": đang nhảy VÀ đã lên đủ cao hơn đầu Boss
+        // jumpForce = -1200, đỉnh nhảy ≈ 180px → đầu Boss ≈ boss.y - 160px
+        // Threshold thấp hơn để dễ nhảy qua (100px thay vì 120px)
+        bool jumpingOver = player->isJumping && (player->position.y < boss->position.y - 100.0f);
+
+        if (absDx < minSep && !jumpingOver) {
+            // Đẩy Mèo ra đúng khoảng cách tối thiểu theo hướng hiện tại
+            float pushDir = (dx >= 0.0f) ? 1.0f : -1.0f;
+            player->position.x = boss->position.x + pushDir * minSep;
+        }
+    }
+
+    // Arena clamp cho PLAYER chạy SAU collision để không bị xung đột thứ tự
+    if (player->controlsEnabled && player->currentHP > 0.0f) {
+        if (player->position.x < 35.0f) player->position.x = 35.0f;
+        if (player->position.x > 1315.0f) player->position.x = 1315.0f;
+    }
+
+    // Giới hạn khu vực đấu boss (Dead Cells style) - Boss
+    if (boss->position.x < 35.0f) boss->position.x = 35.0f;
+    if (boss->position.x > 1315.0f) boss->position.x = 1315.0f;
 }
 
 void DrawBoss(Boss *boss, float scale) {
@@ -384,41 +1010,229 @@ void DrawBoss(Boss *boss, float scale) {
 
     // Căn lề bottom-center cho Boss tương tự như Player
     // Vì chiều cao Boss là 93px (lớn hơn 64px của mèo), yOffset sẽ điều chỉnh để đứng chính xác trên đất
-    float yOffset = 18.0f; 
+    float yOffset = 20.0f; 
+
+    // Bù đắp độ lệch tâm của Sprite (Sprite offset compensation) để tránh Boss bị dịch chuyển/teleport khi quay đầu
+    float baseOffset = 35.0f;
+    switch (boss->state) {
+        case BOSS_STATE_IDLE:   baseOffset = 34.75f; break;
+        case BOSS_STATE_WALK:   baseOffset = 31.31f; break;
+        case BOSS_STATE_ATTACK: baseOffset = 16.00f; break;
+        case BOSS_STATE_CAST:   baseOffset = 29.89f; break;
+        case BOSS_STATE_HURT:   baseOffset = 35.33f; break;
+        case BOSS_STATE_DEATH:  baseOffset = 37.20f; break;
+        default:                baseOffset = 35.00f; break;
+    }
+    float xOffset = boss->facingRight ? (baseOffset * scale) : -(baseOffset * scale);
+
     Rectangle dest = { 
-        boss->position.x, 
-        boss->position.y + yOffset, 
+        roundf(boss->position.x + xOffset), 
+        roundf(boss->position.y + yOffset), 
         frameW * scale, 
         frameH * scale 
     };
-
     // Điểm tựa (origin) ở đáy giữa khung hình
     Vector2 origin = { (frameW * scale) / 2.0f, frameH * scale };
 
-    // Vẽ Boss với hiệu ứng chớp đỏ nếu bị đau
+    // Vẽ Boss với hiệu ứng chớp đỏ nếu bị đau hoặc rực đỏ giận dữ ở Phase 3 (Berserk)
     Color tint = WHITE;
     if (boss->state == BOSS_STATE_HURT) {
         tint = (Color){ 255, 120, 120, 255 };
+    } else if (boss->currentPhase == 3) {
+        // Nhấp nháy sắc đỏ giận dữ theo nhịp thở (sin wave)
+        unsigned char redPulse = (unsigned char)(190 + 65.0f * sinf(GetTime() * 8.0f));
+        tint = (Color){ 255, redPulse, redPulse, 255 };
     }
 
     DrawTexturePro(currentTex, source, dest, origin, 0.0f, tint);
 
     // Vẽ Projectile nếu đang hoạt động
     if (boss->projectile.active) {
-        Texture2D projTex = texSpellDarkBolt[boss->projectile.currentFrame % 12];
-        Rectangle projSource = { 0, 0, (float)projTex.width, (float)projTex.height };
-        if (boss->projectile.velocity.x > 0) {
-            projSource.width = -projSource.width; // Flip theo chiều bay
+        if (boss->projectile.type == SPELL_DARK_BOLT) {
+            Texture2D projTex = texSpellDarkBolt[boss->projectile.currentFrame % 12];
+            Rectangle projSource = { 0, 0, (float)projTex.width, (float)projTex.height };
+            if (boss->projectile.velocity.x > 0) {
+                projSource.width = -projSource.width; // Flip theo chiều bay
+            }
+            
+            Rectangle projDest = {
+                boss->projectile.position.x,
+                boss->projectile.position.y,
+                (float)projTex.width * 1.5f,
+                (float)projTex.height * 1.5f
+            };
+            Vector2 projOrigin = { ((float)projTex.width * 1.5f) / 2.0f, ((float)projTex.height * 1.5f) / 2.0f };
+            DrawTexturePro(projTex, projSource, projDest, projOrigin, 0.0f, WHITE);
         }
-        
-        Rectangle projDest = {
-            boss->projectile.position.x,
-            boss->projectile.position.y,
-            (float)projTex.width * 1.5f,
-            (float)projTex.height * 1.5f
-        };
-        Vector2 projOrigin = { ((float)projTex.width * 1.5f) / 2.0f, ((float)projTex.height * 1.5f) / 2.0f };
-        DrawTexturePro(projTex, projSource, projDest, projOrigin, 0.0f, WHITE);
+        else if (boss->projectile.type == SPELL_FIRE_BOMB) {
+            if (boss->projectile.state == 0) {
+                // Vẽ vòng tròn ma thuật tím cảnh báo (Bringer-of-Death_Spell) dưới mặt đất
+                Texture2D warningTex = texSpellDeathSpell[boss->projectile.currentFrame % 16];
+                Rectangle projSource = { 0, 0, (float)warningTex.width, (float)warningTex.height };
+                float scaleMod = 2.0f;
+                Rectangle projDest = {
+                    boss->projectile.position.x,
+                    boss->projectile.position.y, // Đặt thẳng xuống mặt đất
+                    (float)warningTex.width * scaleMod,
+                    (float)warningTex.height * scaleMod
+                };
+                // Quay 180 độ và đặt gốc tọa độ ở trên cùng (0) để "mở cổng" bắn ngược lên trời
+                Vector2 projOrigin = { ((float)warningTex.width * scaleMod) / 2.0f, 0.0f };
+                DrawTexturePro(warningTex, projSource, projDest, projOrigin, 180.0f, WHITE);
+            }
+            else {
+                // Vẽ quả bom lửa bùng nổ (Fire-bomb)
+                Texture2D projTex = texSpellFireBomb[boss->projectile.currentFrame % 15];
+                Rectangle projSource = { 0, 0, (float)projTex.width, (float)projTex.height };
+                
+                // Tăng độ to thêm 15% cho Phase 1 (2.8f * 1.15 = 3.22f) và 20% cho Phase 2 (2.8f * 1.20 = 3.36f)
+                float scaleMod = (boss->currentPhase == 2) ? 3.36f : 3.22f;
+                float yOffset = (boss->currentPhase == 2) ? 30.0f : 28.75f;
+                
+                Rectangle projDest = {
+                    boss->projectile.position.x,
+                    boss->projectile.position.y - yOffset, // Căn lề nổ từ dưới đất trồi lên
+                    (float)projTex.width * scaleMod,
+                    (float)projTex.height * scaleMod
+                };
+                Vector2 projOrigin = { ((float)projTex.width * scaleMod) / 2.0f, ((float)projTex.height * scaleMod) / 2.0f };
+                DrawTexturePro(projTex, projSource, projDest, projOrigin, 0.0f, WHITE);
+            }
+        }
+        else if (boss->projectile.type == SPELL_LIGHTNING) {
+            if (boss->projectile.state == 0) {
+                // Vẽ chỉ báo cảnh báo sét đánh nhấp nháy đỏ trên mặt đất
+                DrawCircle((int)boss->projectile.position.x, (int)boss->projectile.position.y, (int)boss->projectile.radius, (Color){ 230, 40, 40, 100 });
+                DrawCircleLines((int)boss->projectile.position.x, (int)boss->projectile.position.y, (int)boss->projectile.radius, RED);
+            } 
+            else {
+                // Vẽ cột sét thẳng đứng từ trên trời
+                Texture2D projTex = texSpellLightning[boss->projectile.currentFrame % 11];
+                Rectangle projSource = { 0, 0, (float)projTex.width, (float)projTex.height };
+                
+                float scaleX = 2.0f;
+                // Kéo giãn theo chiều dọc đến mặt đất
+                Rectangle projDest = {
+                    boss->projectile.position.x,
+                    0.0f,
+                    (float)projTex.width * scaleX,
+                    boss->projectile.position.y
+                };
+                Vector2 projOrigin = { ((float)projTex.width * scaleX) / 2.0f, 0.0f };
+                DrawTexturePro(projTex, projSource, projDest, projOrigin, 0.0f, WHITE);
+            }
+        }
+        else if (boss->projectile.type == SPELL_DEATH_SPELL) {
+            if (boss->projectile.state == 0) {
+                // Vẽ vòng tòa sáng nhỏ cảnh báo quanh đầu Boss
+                DrawCircle((int)boss->projectile.position.x, (int)boss->projectile.position.y, (int)boss->projectile.radius, (Color){ 130, 30, 210, 80 });
+                DrawCircleLines((int)boss->projectile.position.x, (int)boss->projectile.position.y, (int)boss->projectile.radius, PURPLE);
+            }
+            else {
+                // Vẽ Death Spell gấp 3 lần to hơn, căn giữa theo đầu Boss
+                Texture2D projTex = texSpellDeathSpell[boss->projectile.currentFrame % 16];
+                Rectangle projSource = { 0, 0, (float)projTex.width, (float)projTex.height };
+                
+                float scaleMod = 7.5f; // Gấp 3 lần (từ 2.5f lên 7.5f)
+                Rectangle projDest = {
+                    boss->projectile.position.x,
+                    boss->projectile.position.y,
+                    (float)projTex.width * scaleMod,
+                    (float)projTex.height * scaleMod
+                };
+                // Đặt Origin ở dưới cùng (đáy) để cột sét giáng từ trên trời xuống mặt đất
+                Vector2 projOrigin = { ((float)projTex.width * scaleMod) / 2.0f, (float)projTex.height * scaleMod };
+                DrawTexturePro(projTex, projSource, projDest, projOrigin, 0.0f, WHITE); // Không lật ngược nữa
+            }
+        }
+    }
+
+    // Vẽ các Projectile phụ phân mảnh từ FireBomb
+    for (int i = 0; i < 2; i++) {
+        if (boss->extraProjectiles[i].active) {
+            Texture2D projTex = texSpellDarkBolt[boss->extraProjectiles[i].currentFrame % 12];
+            Rectangle projSource = { 0, 0, (float)projTex.width, (float)projTex.height };
+            if (boss->extraProjectiles[i].velocity.x > 0) {
+                projSource.width = -projSource.width;
+            }
+            // Vẽ nhỏ hơn đạn chính một chút
+            Rectangle projDest = {
+                boss->extraProjectiles[i].position.x,
+                boss->extraProjectiles[i].position.y,
+                (float)projTex.width * 1.0f,
+                (float)projTex.height * 1.0f
+            };
+            Vector2 projOrigin = { ((float)projTex.width * 1.0f) / 2.0f, ((float)projTex.height * 1.0f) / 2.0f };
+            DrawTexturePro(projTex, projSource, projDest, projOrigin, 0.0f, WHITE);
+        }
+    }
+    // (Đã xóa hiệu ứng Aura và Rage Aura theo yêu cầu)
+
+    // Vẽ các đạn bám đuôi auraSparks (sử dụng spark loop thay vì DarkBolt)
+    for (int i = 0; i < 4; i++) {
+        if (boss->auraSparks[i].active) {
+            Texture2D projTex = texSpellSpark[boss->auraSparks[i].currentFrame % 7];
+            Rectangle projSource = { 0, 0, (float)projTex.width, (float)projTex.height };
+            if (boss->auraSparks[i].velocity.x > 0) {
+                projSource.width = -projSource.width;
+            }
+            float scale = 2.0f; // Scale lớn hơn chút cho dễ nhìn
+            Rectangle projDest = {
+                boss->auraSparks[i].position.x,
+                boss->auraSparks[i].position.y,
+                (float)projTex.width * scale,
+                (float)projTex.height * scale
+            };
+            Vector2 projOrigin = { ((float)projTex.width * scale) / 2.0f, ((float)projTex.height * scale) / 2.0f };
+            DrawTexturePro(projTex, projSource, projDest, projOrigin, 0.0f, WHITE);
+        }
+    }
+
+    // Vẽ Thiên Lôi Phạt (mảng 4 tia sét giáng xuống đồng thời)
+    for (int i = 0; i < 4; i++) {
+        if (boss->lightningStrikes[i].active) {
+            if (boss->lightningStrikes[i].state == 0) {
+                // Vẽ vệt sáng laser dọc cảnh báo từ đỉnh màn hình xuống đất
+                DrawRectangle((int)boss->lightningStrikes[i].position.x - 5, 0, 10, (int)boss->lightningStrikes[i].position.y, (Color){ 230, 40, 40, 95 });
+                DrawLine((int)boss->lightningStrikes[i].position.x, 0, (int)boss->lightningStrikes[i].position.x, (int)boss->lightningStrikes[i].position.y, RED);
+            }
+            else {
+                // Sét giáng xuống
+                Texture2D projTex = texSpellLightning[boss->lightningStrikes[i].currentFrame % 11];
+                Rectangle projSource = { 0, 0, (float)projTex.width, (float)projTex.height };
+                float scaleX = 2.0f;
+                Rectangle projDest = {
+                    boss->lightningStrikes[i].position.x,
+                    0.0f,
+                    (float)projTex.width * scaleX,
+                    boss->lightningStrikes[i].position.y
+                };
+                Vector2 projOrigin = { ((float)projTex.width * scaleX) / 2.0f, 0.0f };
+                DrawTexturePro(projTex, projSource, projDest, projOrigin, 0.0f, WHITE);
+            }
+        }
+    }
+    // Vẽ Tam đại cột tối phụ (deathSpells[0] và deathSpells[1])
+    for (int i = 0; i < 2; i++) {
+        if (boss->deathSpells[i].active) {
+            if (boss->deathSpells[i].state == 0) {
+                DrawEllipse((int)boss->deathSpells[i].position.x, (int)boss->deathSpells[i].position.y, (int)boss->deathSpells[i].radius, 10, (Color){ 130, 30, 210, 120 });
+                DrawEllipseLines((int)boss->deathSpells[i].position.x, (int)boss->deathSpells[i].position.y, (int)boss->deathSpells[i].radius, 10, PURPLE);
+            }
+            else {
+                Texture2D projTex = texSpellDeathSpell[boss->deathSpells[i].currentFrame % 16];
+                Rectangle projSource = { 0, 0, (float)projTex.width, (float)projTex.height };
+                float scaleMod = 2.0f; // Hơi nhỏ hơn cột chính tí
+                Rectangle projDest = {
+                    boss->deathSpells[i].position.x,
+                    boss->deathSpells[i].position.y + 10.0f,
+                    (float)projTex.width * scaleMod,
+                    (float)projTex.height * scaleMod
+                };
+                Vector2 projOrigin = { ((float)projTex.width * scaleMod) / 2.0f, (float)projTex.height * scaleMod }; // Đặt gốc ở dưới cùng để giáng từ trên xuống
+                DrawTexturePro(projTex, projSource, projDest, projOrigin, 0.0f, WHITE);
+            }
+        }
     }
 }
 

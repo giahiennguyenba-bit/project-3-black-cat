@@ -66,8 +66,9 @@ MyCamera CameraNew(float x, float y, float screenW, float screenH) {
 // Tương đương camera:lookAt(x, y) trong Lua
 void CameraLookAt(MyCamera *cam, Vector2 pos) {
     cam->target      = pos;
-    cam->rl.target   = pos;
+    cam->rl.target   = (Vector2){ roundf(pos.x), roundf(pos.y) };
 }
+
 
 // --- Update (gọi mỗi frame) ---
 // Đây là hàm quan trọng nhất, kết hợp mọi tính năng
@@ -149,9 +150,9 @@ void CameraUpdate(MyCamera *cam, Vector2 targetPos, float deltaTime) {
         shakeOffset.y = ((float)(GetRandomValue(-100, 100)) / 100.0f) * s;
     }
 
-    // 5. CẬP NHẬT CAMERA RAYLIB
-    cam->rl.target.x = cam->target.x + shakeOffset.x;
-    cam->rl.target.y = cam->target.y + shakeOffset.y;
+    // 5. CẬP NHẬT CAMERA RAYLIB (Làm tròn toạ độ nguyên để chống giật)
+    cam->rl.target.x = roundf(cam->target.x + shakeOffset.x);
+    cam->rl.target.y = roundf(cam->target.y + shakeOffset.y);
     cam->rl.zoom     = cam->zoom;
     cam->rl.rotation = cam->rotation;
 }
