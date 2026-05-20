@@ -15,14 +15,18 @@ typedef struct {
     bool    isRunning;
     bool    isSprinting;
     bool    isAttacking;
+    bool    isHurt;
     float   freezeTimer;
     int     currentFrame;
     float   frameTimer;
+    bool    controlsEnabled;
+    float   maxHP;
+    float   currentHP;
 } Player;
 
 // --- API Nhân vật ---
 void InitPlayer(Player *player, Vector2 pos);
 void UpdatePlayer(Player *player, float deltaTime);
-void DrawPlayer(Player *player, Texture2D idle, Texture2D walk, Texture2D run, Texture2D jump, Texture2D attack, int frameW, int frameH, float scale);
+void DrawPlayer(Player *player, Texture2D idle, Texture2D walk, Texture2D run, Texture2D jump, Texture2D attack, Texture2D hurt, int frameW, int frameH, float scale);
 
 #endif // GAME_H
