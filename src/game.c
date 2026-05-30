@@ -14,6 +14,9 @@ void InitPlayer(Player *player, Vector2 pos) {
     player->freezeTimer = 0.0f;
     player->currentFrame = 0;
     player->frameTimer = 0.0f;
+    player->health = 9;
+    player->maxHealth = 9;
+    player->hurtTimer = 0.0f;
 }
 
 void UpdatePlayer(Player *player, float deltaTime) {
@@ -26,6 +29,7 @@ void UpdatePlayer(Player *player, float deltaTime) {
     float animSpeed = 0.1f; 
 
     if (player->freezeTimer > 0) player->freezeTimer -= deltaTime;
+    if (player->hurtTimer > 0) player->hurtTimer -= deltaTime;
 
     if (IsKeyDown(KEY_LEFT_SHIFT)) { 
         currentSpeed *= 1.8f; 
@@ -66,15 +70,20 @@ void UpdatePlayer(Player *player, float deltaTime) {
         }
     }
 
+    if (player->position.y < player->groundY) {
+        player->isJumping = true;
+    }
+
     if (player->isJumping) {
         player->velocity.y += gravity * deltaTime;
         player->position.y += player->velocity.y * deltaTime;
-        if (player->position.y >= player->groundY) {
-            player->position.y = player->groundY;
-            player->velocity.y = 0;
-            player->isJumping = false;
-        }
         if (!player->isAttacking) animSpeed = 0.1f; 
+    }
+
+    if (player->position.y >= player->groundY) {
+        player->position.y = player->groundY;
+        player->velocity.y = 0;
+        player->isJumping = false;
     }
 
     player->frameTimer += deltaTime;
@@ -112,5 +121,12 @@ void DrawPlayer(Player *player, Texture2D idle, Texture2D walk, Texture2D run, T
     if (player->facingRight) source.width = -source.width;
     
     Rectangle dest = { player->position.x, player->position.y + yOffset, (float)frameW * scale, (float)frameH * scale };
-    DrawTexturePro(currentTex, source, dest, (Vector2){(float)frameW * scale / 2.0f, (float)frameH * scale}, 0.0f, WHITE);
+    Color tint = WHITE;
+    if (player->hurtTimer > 0.0f) {
+        // Nhấp nháy màu đỏ khi bị thương
+        if (((int)(player->hurtTimer * 15.0f)) % 2 == 0) {
+            tint = RED;
+        }
+    }
+    DrawTexturePro(currentTex, source, dest, (Vector2){(float)frameW * scale / 2.0f, (float)frameH * scale}, 0.0f, tint);
 }

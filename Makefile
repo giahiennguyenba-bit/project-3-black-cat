@@ -7,7 +7,7 @@ LDFLAGS = -Lraylib/lib -lraylib -lopengl32 -lgdi32 -lwinmm
 # Tệp nguồn chính (Tự động biên dịch tất cả file .c trong thư mục src)
 SRC = $(wildcard src/*.c)
 OBJ = $(SRC:.c=.o)
-EXE = theforest.exe
+EXE = cat-game.exe
 
 all: $(EXE)
 

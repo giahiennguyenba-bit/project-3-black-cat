@@ -18,6 +18,9 @@ typedef struct {
     float   freezeTimer;
     int     currentFrame;
     float   frameTimer;
+    int     health;
+    int     maxHealth;
+    float   hurtTimer;
 } Player;
 
 // --- API Nhân vật ---
