@@ -197,7 +197,8 @@ int main(void) {
             introState = INTRO_WALK_IN;
             introTimer = 0.0f;
             myCam.zoom = 1.0f;
-            CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+            myCam.boundsEnabled = false;
+            CameraLookAt(&myCam, (Vector2){player.position.x, player.position.y - 86.0f});
             printf("Restarted the Boss Fight in Placeholder Arena!\n");
         } else {
             // Reset ở map hướng dẫn
@@ -235,7 +236,8 @@ int main(void) {
             bossInitialized = true;
 
             myCam.zoom = 1.0f;
-            CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+            myCam.boundsEnabled = false;
+            CameraLookAt(&myCam, (Vector2){player.position.x, player.position.y - 86.0f});
 
             // Bắt đầu chuỗi Intro giới thiệu Boss
             introState = INTRO_WALK_IN;
@@ -314,7 +316,8 @@ int main(void) {
                 bossInitialized = true;
 
                 myCam.zoom = 1.0f;
-                CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+                myCam.boundsEnabled = false;
+                CameraLookAt(&myCam, (Vector2){player.position.x, player.position.y - 86.0f});
 
                 // Bắt đầu chuỗi Intro giới thiệu Boss
                 introState = INTRO_WALK_IN;
@@ -487,7 +490,8 @@ int main(void) {
         if (introState == INTRO_FIGHT) {
             CameraSetBounds(&myCam, 1351.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         } else {
-            CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+            // Không áp dụng giới hạn biên camera trong quá trình Intro để camera đi theo mèo và lia sang boss
+            myCam.boundsEnabled = false;
         }
         
         CameraUpdate(&myCam, camTarget, dt);
@@ -543,21 +547,20 @@ int main(void) {
 
     if (currentMapIndex == 1) {
         // Đấu trường đá (Stone Platform Altar) tự vẽ
-        float arenaWidth = 2500.0f;
-        DrawRectangleRec((Rectangle){ -500, 640, arenaWidth + 1000, 384 }, (Color){16, 16, 24, 255});
+        DrawRectangleRec((Rectangle){ -1500, 640, 5000, 384 }, (Color){16, 16, 24, 255});
         
         // Vân kẻ ô lát đá
-        for (float gx = -500; gx < arenaWidth + 500; gx += 64) {
+        for (float gx = -1500; gx < 3500; gx += 64) {
             DrawLineV((Vector2){ gx, 640 }, (Vector2){ gx, 1024 }, (Color){28, 28, 40, 255});
         }
         for (float gy = 640; gy < 1024; gy += 64) {
-            DrawLineV((Vector2){ -500, gy }, (Vector2){ arenaWidth + 500, gy }, (Color){28, 28, 40, 255});
+            DrawLineV((Vector2){ -1500, gy }, (Vector2){ 3500, gy }, (Color){28, 28, 40, 255});
         }
         
         // Viền Neon Đỏ phát sáng
-        DrawLineEx((Vector2){ -500, 640 }, (Vector2){ arenaWidth + 500, 640 }, 4.0f, (Color){255, 46, 99, 255});
-        DrawLineEx((Vector2){ -500, 639 }, (Vector2){ arenaWidth + 500, 639 }, 8.0f, Fade((Color){255, 46, 99, 255}, 0.25f));
-        DrawLineEx((Vector2){ -500, 638 }, (Vector2){ arenaWidth + 500, 638 }, 14.0f, Fade((Color){255, 46, 99, 255}, 0.1f));
+        DrawLineEx((Vector2){ -1500, 640 }, (Vector2){ 3500, 640 }, 4.0f, (Color){255, 46, 99, 255});
+        DrawLineEx((Vector2){ -1500, 639 }, (Vector2){ 3500, 639 }, 8.0f, Fade((Color){255, 46, 99, 255}, 0.25f));
+        DrawLineEx((Vector2){ -1500, 638 }, (Vector2){ 3500, 638 }, 14.0f, Fade((Color){255, 46, 99, 255}, 0.1f));
 
         // Hiệu ứng hạt bụi phép vàng trôi lơ lửng
         DrawParticles();
