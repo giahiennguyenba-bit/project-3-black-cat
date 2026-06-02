@@ -22,6 +22,7 @@ typedef struct {
     bool    controlsEnabled;
     float   maxHP;
     float   currentHP;
+    float   hurtTimer;
 } Player;
 
 // --- API Nhân vật ---

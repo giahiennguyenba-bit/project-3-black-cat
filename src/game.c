@@ -1,12 +1,11 @@
 #include "game.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "raylib.h"
 #include <math.h>
+
 void InitPlayer(Player *player, Vector2 pos) {
     player->position = pos;
     player->velocity = (Vector2){0, 0};
-    player->speed = (Vector2){250.0f, 0.0f};
+    player->speed = (Vector2){300.0f, 0}; // Tốc độ di chuyển ngang mặc định
     player->groundY = pos.y;
     player->facingRight = true;
     player->isJumping = false;
@@ -18,6 +17,7 @@ void InitPlayer(Player *player, Vector2 pos) {
     player->isHurt = false;
     player->maxHP = 9.0f;
     player->currentHP = 9.0f;
+    player->hurtTimer = 0.0f;
 }
 
 void UpdatePlayer(Player *player, float deltaTime) {
@@ -30,6 +30,8 @@ void UpdatePlayer(Player *player, float deltaTime) {
     float animSpeed = 0.1f; 
 
     if (player->freezeTimer > 0) player->freezeTimer -= deltaTime;
+    if (player->hurtTimer > 0) player->hurtTimer -= deltaTime;
+
     if (player->controlsEnabled) {
         if (IsKeyDown(KEY_LEFT_SHIFT)) { 
             currentSpeed *= 1.8f; 
@@ -72,15 +74,20 @@ void UpdatePlayer(Player *player, float deltaTime) {
         }
     }
 
+    if (player->position.y < player->groundY) {
+        player->isJumping = true;
+    }
+
     if (player->isJumping) {
         player->velocity.y += gravity * deltaTime;
         player->position.y += player->velocity.y * deltaTime;
-        if (player->position.y >= player->groundY) {
-            player->position.y = player->groundY;
-            player->velocity.y = 0;
-            player->isJumping = false;
-        }
         if (!player->isAttacking) animSpeed = 0.1f; 
+    }
+
+    if (player->position.y >= player->groundY) {
+        player->position.y = player->groundY;
+        player->velocity.y = 0;
+        player->isJumping = false;
     }
 
     player->frameTimer += deltaTime;
@@ -97,8 +104,7 @@ void UpdatePlayer(Player *player, float deltaTime) {
         player->isHurt = false;
     }
 
-    // Arena clamp được xử lý ở boss.c sau collision để tránh bị đè thứ tự sai
-    // (Chỉ clamp biên nếu không có boss, tức là trong menu/intro)
+    // Clamp horizontal position when controls are enabled and player is alive
     if (player->controlsEnabled && player->currentHP > 0.0f) {
         if (player->position.x < 35.0f) player->position.x = 35.0f;
         if (player->position.x > 1315.0f) player->position.x = 1315.0f;
@@ -108,7 +114,7 @@ void UpdatePlayer(Player *player, float deltaTime) {
 void DrawPlayer(Player *player, Texture2D idle, Texture2D walk, Texture2D run, Texture2D jump, Texture2D attack, Texture2D hurt, int frameW, int frameH, float scale) {
     Texture2D currentTex = idle;
     int maxFrames = 10;
-    int spacing = 16; // Khôi phục spacing 16px
+    int spacing = 16; // Spacing 16px
     int frameIdx = player->currentFrame % maxFrames;
 
     if (player->isHurt) { currentTex = hurt; maxFrames = 4; }
@@ -130,8 +136,16 @@ void DrawPlayer(Player *player, Texture2D idle, Texture2D walk, Texture2D run, T
     float yOffset = 16.0f;
     Rectangle source = { frameX, 0, (float)frameW, (float)frameH };
     
-    // Khôi phục logic hướng nhìn chuẩn của Sprite mèo
+    // Hướng nhìn chuẩn của Sprite mèo
     if (player->facingRight) source.width = -source.width;
+    
     Rectangle dest = { roundf(player->position.x), roundf(player->position.y + yOffset), (float)frameW * scale, (float)frameH * scale };
-    DrawTexturePro(currentTex, source, dest, (Vector2){(float)frameW * scale / 2.0f, (float)frameH * scale}, 0.0f, WHITE);
+    Color tint = WHITE;
+    if (player->hurtTimer > 0.0f) {
+        // Nhấp nháy màu đỏ khi bị thương
+        if (((int)(player->hurtTimer * 15.0f)) % 2 == 0) {
+            tint = RED;
+        }
+    }
+    DrawTexturePro(currentTex, source, dest, (Vector2){(float)frameW * scale / 2.0f, (float)frameH * scale}, 0.0f, tint);
 }

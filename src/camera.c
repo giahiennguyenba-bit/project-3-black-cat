@@ -132,13 +132,23 @@ void CameraUpdate(MyCamera *cam, Vector2 targetPos, float deltaTime) {
         float topSpace    = cam->rl.offset.y / cam->zoom;
         float bottomSpace = (cam->viewportHeight - cam->rl.offset.y) / cam->zoom;
 
-        cam->target.x = Clampf(cam->target.x, 
-            cam->bounds.x + leftSpace, 
-            cam->bounds.x + cam->bounds.width - rightSpace);
+        // Nếu chiều rộng của bản đồ nhỏ hơn vùng hiển thị, căn giữa camera theo chiều ngang
+        if (cam->bounds.width < (leftSpace + rightSpace)) {
+            cam->target.x = cam->bounds.x + cam->bounds.width / 2.0f - (cam->viewportWidth / 2.0f - cam->rl.offset.x) / cam->zoom;
+        } else {
+            cam->target.x = Clampf(cam->target.x, 
+                cam->bounds.x + leftSpace, 
+                cam->bounds.x + cam->bounds.width - rightSpace);
+        }
             
-        cam->target.y = Clampf(cam->target.y, 
-            cam->bounds.y + topSpace, 
-            cam->bounds.y + cam->bounds.height - bottomSpace);
+        // Nếu chiều cao của bản đồ nhỏ hơn vùng hiển thị, căn giữa camera theo chiều dọc
+        if (cam->bounds.height < (topSpace + bottomSpace)) {
+            cam->target.y = cam->bounds.y + cam->bounds.height / 2.0f - (cam->viewportHeight / 2.0f - cam->rl.offset.y) / cam->zoom;
+        } else {
+            cam->target.y = Clampf(cam->target.y, 
+                cam->bounds.y + topSpace, 
+                cam->bounds.y + cam->bounds.height - bottomSpace);
+        }
     }
 
     // 4. XỬ LÝ SCREEN SHAKE
