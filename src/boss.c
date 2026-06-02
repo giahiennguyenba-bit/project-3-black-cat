@@ -1217,9 +1217,8 @@ void DrawBoss(Boss *boss, float scale) {
         source.width = -source.width;
     }
 
-    // Căn lề bottom-center cho Boss tương tự như Player
-    // Vì chiều cao Boss là 93px (lớn hơn 64px của mèo), yOffset sẽ điều chỉnh để đứng chính xác trên đất
-    float yOffset = 20.0f; 
+    // Cần yOffset = 0.0f để chân Boss đứng chính xác trên đường biên đất đỏ
+    float yOffset = 0.0f; 
 
     // Bù đắp độ lệch tâm của Sprite (Sprite offset compensation) để tránh Boss bị dịch chuyển/teleport khi quay đầu
     float baseOffset = 35.0f;

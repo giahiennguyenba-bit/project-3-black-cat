@@ -49,8 +49,8 @@ void UpdatePlayer(Player *player, float deltaTime) {
         if (player->isAttacking) animSpeed = 0.07f;
         if (player->isHurt) animSpeed = 0.12f;
         
-        // Nhảy bằng SPACE hoặc phím W
-        if ((IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_W)) && !player->isJumping) {
+        // Nhảy bằng SPACE hoặc phím W (Cho phép nhảy nếu sát mặt đất để tăng độ nhạy và giảm delay)
+        if ((IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_W)) && (player->position.y >= player->groundY - 5.0f)) {
             player->velocity.y = jumpForce;
             player->isJumping = true;
             if (!player->isAttacking) {
@@ -104,11 +104,6 @@ void UpdatePlayer(Player *player, float deltaTime) {
         player->isHurt = false;
     }
 
-    // Clamp horizontal position when controls are enabled and player is alive
-    if (player->controlsEnabled && player->currentHP > 0.0f) {
-        if (player->position.x < 35.0f) player->position.x = 35.0f;
-        if (player->position.x > 1315.0f) player->position.x = 1315.0f;
-    }
 }
 
 void DrawPlayer(Player *player, Texture2D idle, Texture2D walk, Texture2D run, Texture2D jump, Texture2D attack, Texture2D hurt, int frameW, int frameH, float scale) {

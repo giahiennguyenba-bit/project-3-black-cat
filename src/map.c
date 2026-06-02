@@ -251,7 +251,7 @@ float MapGetGroundY(cute_tiled_map_t* map, float x, float currentY) {
             }
             
             if (count == 0) {
-                return l->objects->y; // Trả về đối tượng đầu tiên nếu không tìm thấy gì khác
+                return 9999.0f; // Không có mặt đất ở hoành độ này (rơi xuống vực)
             }
             
             // Nếu không xác định currentY (như khởi tạo), chọn nền cao nhất (Y nhỏ nhất) bỏ qua trần
@@ -289,22 +289,24 @@ float MapGetGroundY(cute_tiled_map_t* map, float x, float currentY) {
                 return bestY;
             }
             
-            // Nếu nằm hoàn toàn dưới tất cả mặt đất, lấy mặt đất gần nhất (bỏ qua trần)
+            // Nếu nằm hoàn toàn dưới tất cả mặt đất, chỉ lấy mặt đất gần nhất nếu nằm sát bên dưới nó (để tránh rơi lọt sàn do fps thấp)
             bestY = -1.0f;
             float minDist = -1.0f;
             for (int i = 0; i < count; i++) {
                 if (candidates[i] < 150.0f) continue; // Bỏ qua trần nhà
-                float dist = fabsf(candidates[i] - currentY);
-                if (bestY == -1.0f || dist < minDist) {
-                    minDist = dist;
-                    bestY = candidates[i];
+                float dist = currentY - candidates[i];
+                if (dist >= 0.0f && dist <= 32.0f) {
+                    if (bestY == -1.0f || dist < minDist) {
+                        minDist = dist;
+                        bestY = candidates[i];
+                    }
                 }
             }
             if (bestY != -1.0f) {
                 return bestY;
             }
             
-            return candidates[0];
+            return 9999.0f;
         }
         l = l->next;
     }

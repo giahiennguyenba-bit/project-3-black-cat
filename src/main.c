@@ -15,7 +15,7 @@
 
 // Danh sách các bản đồ
 const char* mapFiles[] = {
-    "assets/tutorial map.tmj",
+    "assets/parkour.tmj",
     "assets/boss1.tmj"
 };
 int currentMapIndex = 0;
@@ -86,7 +86,7 @@ int main(void) {
   RenderTexture2D target = LoadRenderTexture(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
   SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
 
-  // 1. Load Bản đồ ban đầu (tutorial map)
+  // 1. Load Bản đồ ban đầu (parkour map)
   cute_tiled_map_t* map = NULL;
   if (currentMapIndex == 0) {
       map = MapLoad(mapFiles[currentMapIndex]);
@@ -100,7 +100,7 @@ int main(void) {
   if (currentMapIndex == 0 && map) {
       spawnPoint = MapGetSpawnPoint(map);
   } else {
-      spawnPoint = (Vector2){-50.0f, 640.0f};
+      spawnPoint = (Vector2){50.0f, -200.0f}; // Rơi từ trên trời xuống
   }
 
   Player player = {0};
@@ -110,7 +110,7 @@ int main(void) {
       if (player.position.y < player.groundY) {
           player.isJumping = true;
       }
-      player.controlsEnabled = true; // Bắt đầu ở tutorial map thì tự do di chuyển
+      player.controlsEnabled = true; // Bắt đầu ở parkour map thì tự do di chuyển
   } else {
       player.groundY = 640.0f;
       player.controlsEnabled = false; // Bắt đầu ở màn Boss thì chạy intro
@@ -133,13 +133,12 @@ int main(void) {
       float mapW = (float)map->width * map->tilewidth;
       float mapH = (float)map->height * map->tileheight;
       CameraSetBounds(&myCam, mapW, mapH, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
-      float zoomX = (float)VIRTUAL_WIDTH / mapW;
-      float zoomY = (float)VIRTUAL_HEIGHT / mapH;
-      myCam.zoom = (zoomX > zoomY) ? zoomX : zoomY;
-      myCam.zoom += 0.02f;
-      if (myCam.zoom < 1.2f) myCam.zoom = 1.2f;
+      myCam.zoom = 2.2f; // Zoom lại gần cho riêng map parkour
+      float fixedCamY = mapH - (VIRTUAL_HEIGHT - myCam.rl.offset.y) / myCam.zoom;
+      myCam.target.y = fixedCamY;
+      myCam.rl.target.y = fixedCamY;
   } else {
-      myCam.zoom = 1.2f;
+      myCam.zoom = 2.2f; // Bắt đầu ở zoom 2.2f để bám sát mèo lúc rơi xuống
       CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
   }
 
@@ -150,6 +149,7 @@ int main(void) {
   // --- CẤU HÌNH INTRO CHUYỂN CẢNH ---
   IntroState introState = (currentMapIndex == 1) ? INTRO_WALK_IN : INTRO_FIGHT;
   float introTimer = 0.0f;
+  int introPhase = 0; // 0: Rơi từ trên trời, 1: Quay đầu nhìn quanh, 2: Đi sang phải
 
   // Tạo âm thanh chuyển cảnh/sấm sét procedurally
   Sound introSound = { 0 };
@@ -180,11 +180,11 @@ int main(void) {
     // --- PHÍM TẮT RESET TRẬN ĐẤU ('R') ---
     if (IsKeyPressed(KEY_R)) {
         if (currentMapIndex == 1) {
-            // Reset lại người chơi ở map Boss (spawn phía bên trái)
-            player.position = (Vector2){-50.0f, 640.0f};
+            // Reset lại người chơi ở map Boss (rơi từ trên trời xuống góc bên trái)
+            player.position = (Vector2){50.0f, -200.0f};
             player.groundY = 640.0f;
             player.velocity = (Vector2){0, 0};
-            player.isJumping = false;
+            player.isJumping = true;
             player.currentHP = player.maxHP;
             player.hurtTimer = 0.0f;
             player.controlsEnabled = false;
@@ -196,7 +196,8 @@ int main(void) {
             // Reset lại Intro
             introState = INTRO_WALK_IN;
             introTimer = 0.0f;
-            myCam.zoom = 1.2f;
+            introPhase = 0; // Reset phase cutscene
+            myCam.zoom = 2.2f; // Bắt đầu ở zoom 2.2f
             myCam.boundsEnabled = true;
             CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
             CameraLookAt(&myCam, (Vector2){player.position.x, player.position.y - 86.0f});
@@ -213,7 +214,7 @@ int main(void) {
                 player.hurtTimer = 0.0f;
                 player.controlsEnabled = true;
                 introState = INTRO_FIGHT;
-                printf("Reset Player to Tutorial Spawn!\n");
+                printf("Reset Player to Parkour Spawn!\n");
             }
         }
     }
@@ -226,17 +227,17 @@ int main(void) {
                 MapUnload(map);
                 map = NULL;
             }
-            player.position = (Vector2){-50.0f, 640.0f};
+            player.position = (Vector2){50.0f, -200.0f}; // Rơi từ trời xuống
             player.groundY = 640.0f;
             player.velocity = (Vector2){0, 0};
-            player.isJumping = false;
+            player.isJumping = true;
             player.controlsEnabled = false; // Khóa phím khi chạy intro
 
             // Khởi tạo Boss ở bên phải
             InitBoss(&boss, (Vector2){950.0f, 640.0f});
             bossInitialized = true;
 
-            myCam.zoom = 1.2f;
+            myCam.zoom = 2.2f; // Bắt đầu ở zoom 2.2f
             myCam.boundsEnabled = true;
             CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
             CameraLookAt(&myCam, (Vector2){player.position.x, player.position.y - 86.0f});
@@ -244,7 +245,8 @@ int main(void) {
             // Bắt đầu chuỗi Intro giới thiệu Boss
             introState = INTRO_WALK_IN;
             introTimer = 0.0f;
-            printf("Teleported to original Boss Arena via [B]! Spawn X: -50.0f. Start Intro.\n");
+            introPhase = 0; // Reset phase cutscene
+            printf("Teleported to original Boss Arena via [B]! Spawn X: 50.0f. Start Intro.\n");
         }
     }
 
@@ -255,7 +257,7 @@ int main(void) {
 
     // --- CẬP NHẬT THEO TỪNG MAP ---
     if (currentMapIndex == 0) {
-        // Map 0: Tutorial Map
+        // Map 0: Parkour Map
         if (map) {
             player.groundY = MapGetGroundY(map, player.position.x, player.position.y);
             
@@ -289,6 +291,29 @@ int main(void) {
                 }
             }
 
+            // Va chạm void (vực sâu) hoặc rơi quá sâu dưới map
+            if (MapCheckLayerCollision(map, "void", playerRect) || (player.position.y > 720.0f)) {
+                Vector2 sp = MapGetSpawnPoint(map);
+                player.position = sp;
+                player.groundY = MapGetGroundY(map, player.position.x, player.position.y);
+                player.velocity = (Vector2){0, 0};
+                player.isJumping = false;
+                if (player.hurtTimer <= 0.0f) {
+                    player.currentHP -= 1.0f;
+                    player.hurtTimer = 1.0f;
+                }
+                CameraShake(&myCam, 0.2f, 5.0f);
+                printf("PLAYER FELL INTO VOID! Teleporting to spawnpoint... HP: %.0f/%.0f\n", player.currentHP, player.maxHP);
+            }
+
+            // Va chạm vật phẩm hồi máu (items)
+            if (MapCheckLayerCollision(map, "items", playerRect) || MapCheckLayerCollision(map, "item", playerRect)) {
+                if (player.currentHP < player.maxHP) {
+                    player.currentHP = player.maxHP;
+                    printf("PLAYER HEALED TO FULL HP! HP: %.0f/%.0f\n", player.currentHP, player.maxHP);
+                }
+            }
+
             // Hồi sinh nếu hết máu
             if (player.currentHP <= 0.0f) {
                 Vector2 sp = MapGetSpawnPoint(map);
@@ -298,26 +323,26 @@ int main(void) {
                 player.velocity = (Vector2){0, 0};
                 player.hurtTimer = 0.0f;
                 player.isJumping = false;
-                printf("PLAYER DIED! Respawning to tutorial spawnpoint...\n");
+                printf("PLAYER DIED! Respawning to parkour spawnpoint...\n");
             }
 
-            // Chuyển sang map Boss nếu đi quá rìa trái (X < 16.0f)
-            if (player.position.x < 16.0f) {
+            // Chuyển sang map Boss nếu đi quá rìa trái (X < 16.0f) hoặc chạm vào vùng teleport
+            if (player.position.x < 16.0f || MapCheckLayerCollision(map, "teleport", playerRect)) {
                 currentMapIndex = 1;
                 MapUnload(map);
                 map = NULL;
 
-                player.position = (Vector2){-50.0f, 640.0f};
+                player.position = (Vector2){50.0f, -200.0f}; // Rơi từ trên trời xuống
                 player.groundY = 640.0f;
                 player.velocity = (Vector2){0, 0};
-                player.isJumping = false;
+                player.isJumping = true;
                 player.controlsEnabled = false; // Khóa phím khi chạy intro
 
                 // Khởi tạo Boss ở bên phải
                 InitBoss(&boss, (Vector2){950.0f, 640.0f});
                 bossInitialized = true;
 
-                myCam.zoom = 1.2f;
+                myCam.zoom = 2.2f; // Bắt đầu ở zoom 2.2f
                 myCam.boundsEnabled = true;
                 CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
                 CameraLookAt(&myCam, (Vector2){player.position.x, player.position.y - 86.0f});
@@ -325,16 +350,20 @@ int main(void) {
                 // Bắt đầu chuỗi Intro giới thiệu Boss
                 introState = INTRO_WALK_IN;
                 introTimer = 0.0f;
-                printf("Transitioned to Boss Arena! Spawn X: -50.0f. Start Intro.\n");
+                introPhase = 0; // Reset phase cutscene
+                printf("Transitioned to Boss Arena! Spawn X: 50.0f. Start Intro.\n");
             } else {
                 // Giới hạn trong map
                 float mapW = (float)map->width * map->tilewidth;
                 if (player.position.x > mapW - 16.0f) player.position.x = mapW - 16.0f;
             }
 
-            // Camera follow player
-            Vector2 camTarget = { player.position.x, player.position.y - 86.0f };
-            CameraUpdate(&myCam, camTarget, dt);
+            // Camera follow player: Chỉ di chuyển theo chiều ngang, cố định Y ở biên dưới của map để không nhìn thấy khoảng trống phía trên
+            if (map) {
+                float fixedCamY = (float)map->height * map->tileheight - (VIRTUAL_HEIGHT - myCam.rl.offset.y) / myCam.zoom;
+                Vector2 camTarget = { player.position.x, fixedCamY };
+                CameraUpdate(&myCam, camTarget, dt);
+            }
         }
 
     } else if (currentMapIndex == 1) {
@@ -343,32 +372,87 @@ int main(void) {
 
         // --- CẬP NHẬT INTRO & GAMEPLAY STATE ---
         if (introState == INTRO_WALK_IN) {
-            // Mèo tự động di chuyển sang phải
-            player.position.x += 160.0f * dt;
-            player.facingRight = true;
-            player.isRunning = true;
-            player.isSprinting = false;
-            player.isJumping = false;
-            player.isAttacking = false;
             player.controlsEnabled = false;
+            player.isAttacking = false;
+            player.isHurt = false;
 
-            // Cập nhật frame chạy thủ công
-            player.frameTimer += dt;
-            if (player.frameTimer >= 0.1f) {
-                player.frameTimer = 0.0f;
-                player.currentFrame++;
-            }
-
-            if (player.position.x >= 350.0f) {
-                player.position.x = 350.0f;
+            if (introPhase == 0) {
+                // Phase 0: Rơi từ trên trời xuống
+                player.isJumping = true;
                 player.isRunning = false;
-                player.currentFrame = 0;
-                player.frameTimer = 0.0f;
-                introState = INTRO_PAN_TO_BOSS;
-                introTimer = 0.0f;
+                player.isSprinting = false;
+                player.facingRight = true;
+
+                // Vận tốc rơi tự do thủ công
+                player.velocity.y += 3000.0f * dt;
+                player.position.y += player.velocity.y * dt;
+
+                // Cố định frame nhảy (frame thứ 2 của jump animation)
+                player.currentFrame = 1;
+
+                // Kiểm tra chạm đất
+                if (player.position.y >= player.groundY) {
+                    player.position.y = player.groundY;
+                    player.velocity = (Vector2){0, 0};
+                    player.isJumping = false;
+                    player.currentFrame = 0;
+                    player.frameTimer = 0.0f;
+                    introPhase = 1;
+                    introTimer = 0.0f;
+                }
+            }
+            else if (introPhase == 1) {
+                // Phase 1: Xoay trái/xoay phải nhìn ngó xung quanh
+                introTimer += dt;
+                player.isRunning = false;
+                player.isJumping = false;
+
+                if (introTimer < 0.5f) {
+                    player.facingRight = true;
+                } else if (introTimer < 1.0f) {
+                    player.facingRight = false;
+                } else if (introTimer < 1.5f) {
+                    player.facingRight = true;
+                } else if (introTimer < 2.0f) {
+                    player.facingRight = false;
+                } else {
+                    player.facingRight = true;
+                    introPhase = 2;
+                    introTimer = 0.0f;
+                }
+
+                // Cập nhật frame đứng im thở (idle)
+                player.frameTimer += dt;
+                if (player.frameTimer >= 0.15f) {
+                    player.frameTimer = 0.0f;
+                    player.currentFrame = (player.currentFrame + 1) % 4;
+                }
+            }
+            else if (introPhase == 2) {
+                // Phase 2: Đi tự động sang bên phải
+                player.position.x += 160.0f * dt; // Quay lại tốc độ chạy bình thường
+                player.facingRight = true;
+                player.isRunning = true;
+                player.isJumping = false;
+
+                // Cập nhật frame chạy thủ công
+                player.frameTimer += dt;
+                if (player.frameTimer >= 0.1f) {
+                    player.frameTimer = 0.0f;
+                    player.currentFrame++;
+                }
+
+                if (player.position.x >= 350.0f) {
+                    player.position.x = 350.0f;
+                    player.isRunning = false;
+                    player.currentFrame = 0;
+                    player.frameTimer = 0.0f;
+                    introState = INTRO_PAN_TO_BOSS;
+                    introTimer = 0.0f;
+                }
             }
 
-            // Cập nhật Boss đứng yên thở (Idle)
+            // Cập nhật Boss đứng yên thở (Idle) trong lúc mèo đang làm intro
             if (bossInitialized) {
                 boss.state = BOSS_STATE_IDLE;
                 boss.frameTimer += dt;
@@ -381,9 +465,16 @@ int main(void) {
         else if (introState == INTRO_PAN_TO_BOSS) {
             introTimer += dt;
             float duration = 2.0f;
+            
+            // Nội suy zoom từ 2.2f về 1.2f để kéo camera lùi xa hé lộ toàn cảnh boss
+            float progress = introTimer / duration;
+            if (progress > 1.0f) progress = 1.0f;
+            myCam.zoom = 2.2f + (1.2f - 2.2f) * progress;
+
             if (introTimer > duration) {
                 introState = INTRO_SHOW_NAME;
                 introTimer = 0.0f;
+                myCam.zoom = 1.2f; // Đảm bảo cố định 1.2f khi vào trận đấu
                 
                 // Kích hoạt âm thanh tiếng sấm gầm và rung lắc camera
                 PlaySound(introSound);
@@ -436,7 +527,7 @@ int main(void) {
                         // Boss đã chết, cho phép đi qua rào chắn sang phải để chuyển map
                         if (player.position.x < 16.0f) player.position.x = 16.0f;
                         if (player.position.x > 1315.0f) {
-                            // Chuyển ngược lại về tutorial map
+                            // Chuyển ngược lại về parkour map
                             currentMapIndex = 0;
                             map = MapLoad(mapFiles[currentMapIndex]);
                             if (map) {
@@ -452,14 +543,13 @@ int main(void) {
                                 bossInitialized = false;
 
                                 CameraSetBounds(&myCam, newMapW, newMapH, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
-                                float zoomX = (float)VIRTUAL_WIDTH / newMapW;
-                                float zoomY = (float)VIRTUAL_HEIGHT / newMapH;
-                                myCam.zoom = (zoomX > zoomY) ? zoomX : zoomY;
-                                myCam.zoom += 0.02f;
-                                if (myCam.zoom < 1.2f) myCam.zoom = 1.2f;
+                                myCam.zoom = 2.2f; // Zoom lại gần cho riêng map parkour
+                                float fixedCamY = newMapH - (VIRTUAL_HEIGHT - myCam.rl.offset.y) / myCam.zoom;
+                                myCam.target.y = fixedCamY;
+                                myCam.rl.target.y = fixedCamY;
 
                                 introState = INTRO_FIGHT;
-                                printf("Escaped Boss Arena back to tutorial map! Spawn X: %.1f\n", player.position.x);
+                                printf("Escaped Boss Arena back to parkour map! Spawn X: %.1f\n", player.position.x);
                             }
                         }
                     }
