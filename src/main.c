@@ -196,7 +196,7 @@ int main(void) {
             // Reset lại Intro
             introState = INTRO_WALK_IN;
             introTimer = 0.0f;
-            myCam.zoom = 1.0f;
+            myCam.zoom = 1.6f;
             myCam.boundsEnabled = false;
             CameraLookAt(&myCam, (Vector2){player.position.x, player.position.y - 86.0f});
             printf("Restarted the Boss Fight in Placeholder Arena!\n");
@@ -235,7 +235,7 @@ int main(void) {
             InitBoss(&boss, (Vector2){950.0f, 640.0f});
             bossInitialized = true;
 
-            myCam.zoom = 1.0f;
+            myCam.zoom = 1.6f;
             myCam.boundsEnabled = false;
             CameraLookAt(&myCam, (Vector2){player.position.x, player.position.y - 86.0f});
 
@@ -315,7 +315,7 @@ int main(void) {
                 InitBoss(&boss, (Vector2){950.0f, 640.0f});
                 bossInitialized = true;
 
-                myCam.zoom = 1.0f;
+                myCam.zoom = 1.6f;
                 myCam.boundsEnabled = false;
                 CameraLookAt(&myCam, (Vector2){player.position.x, player.position.y - 86.0f});
 
