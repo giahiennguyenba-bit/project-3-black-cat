@@ -86,21 +86,35 @@ int main(void) {
   RenderTexture2D target = LoadRenderTexture(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
   SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
 
-  // 1. Load Bản đồ ban đầu
-  cute_tiled_map_t* map = MapLoad(mapFiles[currentMapIndex]);
-  if (!map) return -1;
+  // 1. Load Bản đồ ban đầu (tutorial map)
+  cute_tiled_map_t* map = NULL;
+  if (currentMapIndex == 0) {
+      map = MapLoad(mapFiles[currentMapIndex]);
+      if (!map) return -1;
+  }
 
   InitParticles();
 
   // 2. Khởi tạo Nhân vật và Camera
-  Vector2 spawnPoint = MapGetSpawnPoint(map);
+  Vector2 spawnPoint = {0};
+  if (currentMapIndex == 0 && map) {
+      spawnPoint = MapGetSpawnPoint(map);
+  } else {
+      spawnPoint = (Vector2){-50.0f, 640.0f};
+  }
+
   Player player = {0};
   InitPlayer(&player, spawnPoint);
-  player.groundY = MapGetGroundY(map, player.position.x, player.position.y);
-  if (player.position.y < player.groundY) {
-      player.isJumping = true;
+  if (currentMapIndex == 0 && map) {
+      player.groundY = MapGetGroundY(map, player.position.x, player.position.y);
+      if (player.position.y < player.groundY) {
+          player.isJumping = true;
+      }
+      player.controlsEnabled = true; // Bắt đầu ở tutorial map thì tự do di chuyển
+  } else {
+      player.groundY = 640.0f;
+      player.controlsEnabled = false; // Bắt đầu ở màn Boss thì chạy intro
   }
-  player.controlsEnabled = true; // Bắt đầu ở tutorial map thì tự do di chuyển
 
   Texture2D texIdle = LoadTexture("assets/cat_png/Cat-png/CAT-IDLE.png");
   Texture2D texWalk = LoadTexture("assets/cat_png/Cat-png/CAT-WALK.png");
@@ -115,21 +129,26 @@ int main(void) {
   CameraSetSmoothDamped(&myCam, 10.0f);
 
   // Thiết lập biên ban đầu và zoom dựa trên map
-  float mapW = (float)map->width * map->tilewidth;
-  float mapH = (float)map->height * map->tileheight;
-  CameraSetBounds(&myCam, mapW, mapH, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
-  float zoomX = (float)VIRTUAL_WIDTH / mapW;
-  float zoomY = (float)VIRTUAL_HEIGHT / mapH;
-  myCam.zoom = (zoomX > zoomY) ? zoomX : zoomY;
-  myCam.zoom += 0.02f;
-  if (myCam.zoom < 1.2f) myCam.zoom = 1.2f;
+  if (currentMapIndex == 0 && map) {
+      float mapW = (float)map->width * map->tilewidth;
+      float mapH = (float)map->height * map->tileheight;
+      CameraSetBounds(&myCam, mapW, mapH, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+      float zoomX = (float)VIRTUAL_WIDTH / mapW;
+      float zoomY = (float)VIRTUAL_HEIGHT / mapH;
+      myCam.zoom = (zoomX > zoomY) ? zoomX : zoomY;
+      myCam.zoom += 0.02f;
+      if (myCam.zoom < 1.2f) myCam.zoom = 1.2f;
+  } else {
+      myCam.zoom = 1.0f;
+      CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+  }
 
   Boss boss;
   bool bossInitialized = false;
   LoadBossResources();
 
   // --- CẤU HÌNH INTRO CHUYỂN CẢNH ---
-  IntroState introState = INTRO_FIGHT; // Bắt đầu ở map hướng dẫn thì không có intro
+  IntroState introState = (currentMapIndex == 1) ? INTRO_WALK_IN : INTRO_FIGHT;
   float introTimer = 0.0f;
 
   // Tạo âm thanh chuyển cảnh/sấm sét procedurally
@@ -161,37 +180,39 @@ int main(void) {
     // --- PHÍM TẮT RESET TRẬN ĐẤU ('R') ---
     if (IsKeyPressed(KEY_R)) {
         if (currentMapIndex == 1) {
-            // Reset lại người chơi ở map Boss (spawn phía bên phải)
-            float newMapW = (float)map->width * map->tilewidth;
-            player.position.x = newMapW - 24.0f;
-            player.position.y = MapGetGroundY(map, player.position.x, -9999.0f);
-            player.groundY = player.position.y;
+            // Reset lại người chơi ở map Boss (spawn phía bên trái)
+            player.position = (Vector2){-50.0f, 640.0f};
+            player.groundY = 640.0f;
             player.velocity = (Vector2){0, 0};
             player.isJumping = false;
             player.currentHP = player.maxHP;
             player.hurtTimer = 0.0f;
             player.controlsEnabled = false;
 
-            // Reset lại Boss
-            InitBoss(&boss, (Vector2){300.0f, MapGetGroundY(map, 300.0f, -9999.0f)});
+            // Reset lại Boss bên phải
+            InitBoss(&boss, (Vector2){950.0f, 640.0f});
             bossInitialized = true;
 
             // Reset lại Intro
             introState = INTRO_WALK_IN;
             introTimer = 0.0f;
-            printf("Restarted the Boss Fight in Arena!\n");
+            myCam.zoom = 1.0f;
+            CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+            printf("Restarted the Boss Fight in Placeholder Arena!\n");
         } else {
             // Reset ở map hướng dẫn
-            Vector2 sp = MapGetSpawnPoint(map);
-            player.position = sp;
-            player.groundY = MapGetGroundY(map, player.position.x, player.position.y);
-            player.velocity = (Vector2){0, 0};
-            player.isJumping = false;
-            player.currentHP = player.maxHP;
-            player.hurtTimer = 0.0f;
-            player.controlsEnabled = true;
-            introState = INTRO_FIGHT;
-            printf("Reset Player to Tutorial Spawn!\n");
+            if (map) {
+                Vector2 sp = MapGetSpawnPoint(map);
+                player.position = sp;
+                player.groundY = MapGetGroundY(map, player.position.x, player.position.y);
+                player.velocity = (Vector2){0, 0};
+                player.isJumping = false;
+                player.currentHP = player.maxHP;
+                player.hurtTimer = 0.0f;
+                player.controlsEnabled = true;
+                introState = INTRO_FIGHT;
+                printf("Reset Player to Tutorial Spawn!\n");
+            }
         }
     }
 
@@ -199,36 +220,29 @@ int main(void) {
     if (IsKeyPressed(KEY_B)) {
         if (currentMapIndex != 1) {
             currentMapIndex = 1;
-            MapUnload(map);
-            map = MapLoad(mapFiles[currentMapIndex]);
             if (map) {
-                float newMapW = (float)map->width * map->tilewidth;
-                float newMapH = (float)map->height * map->tileheight;
-                player.position.x = newMapW - 24.0f; // Điểm spawn phía bên phải map boss1
-                player.position.y = MapGetGroundY(map, player.position.x, -9999.0f);
-                player.groundY = player.position.y;
-                player.velocity = (Vector2){0, 0};
-                player.isJumping = false;
-                player.controlsEnabled = false; // Khóa phím khi chạy intro
-
-                // Khởi tạo Boss ở bên trái
-                InitBoss(&boss, (Vector2){300.0f, MapGetGroundY(map, 300.0f, -9999.0f)});
-                bossInitialized = true;
-
-                // Cập nhật biên camera cho map mới (boss 1)
-                myCam.zoom = 1.95f;
-                CameraSetBounds(&myCam, newMapW, newMapH, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
-                myCam.bounds.y = 280.0f;
-                myCam.bounds.height = newMapH - 280.0f;
-
-                // Bắt đầu chuỗi Intro giới thiệu Boss
-                introState = INTRO_WALK_IN;
-                introTimer = 0.0f;
-                printf("Teleported to Boss Arena via [B]! Spawn X: %.1f, Y: %.1f. Start Intro.\n", player.position.x, player.position.y);
+                MapUnload(map);
+                map = NULL;
             }
+            player.position = (Vector2){-50.0f, 640.0f};
+            player.groundY = 640.0f;
+            player.velocity = (Vector2){0, 0};
+            player.isJumping = false;
+            player.controlsEnabled = false; // Khóa phím khi chạy intro
+
+            // Khởi tạo Boss ở bên phải
+            InitBoss(&boss, (Vector2){950.0f, 640.0f});
+            bossInitialized = true;
+
+            myCam.zoom = 1.0f;
+            CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+
+            // Bắt đầu chuỗi Intro giới thiệu Boss
+            introState = INTRO_WALK_IN;
+            introTimer = 0.0f;
+            printf("Teleported to original Boss Arena via [B]! Spawn X: -50.0f. Start Intro.\n");
         }
     }
-
 
     // --- CẬP NHẬT TRẠNG THÁI GAME ---
     if (currentMapIndex == 1) {
@@ -238,99 +252,94 @@ int main(void) {
     // --- CẬP NHẬT THEO TỪNG MAP ---
     if (currentMapIndex == 0) {
         // Map 0: Tutorial Map
-        player.groundY = MapGetGroundY(map, player.position.x, player.position.y);
-        
-        float oldX = player.position.x;
-        UpdatePlayer(&player, dt);
-        
-        // Va chạm tường
-        if (MapCheckWallCollision(map, player.position)) {
-            player.position.x = oldX;
-        }
-        
-        // Va chạm trần
-        float ceilingY = MapGetCeilingY(map, player.position.x, player.position.y);
-        if (ceilingY != -9999.0f) {
-            float headOffset = 36.0f;
-            if (player.position.y - headOffset < ceilingY) {
-                player.position.y = ceilingY + headOffset;
-                if (player.velocity.y < 0) player.velocity.y = 0;
-            }
-        }
-
-        // Va chạm bẫy
-        Rectangle playerRect = { player.position.x - 12.0f, player.position.y - 36.0f, 24.0f, 36.0f };
-        if (MapCheckLayerCollision(map, "trap", playerRect)) {
-            if (player.hurtTimer <= 0.0f) {
-                player.currentHP -= 1.0f;
-                player.hurtTimer = 1.0f;
-                player.velocity.y = -500.0f;
-                CameraShake(&myCam, 0.2f, 5.0f);
-                printf("PLAYER HIT TRAP! HP: %.0f/%.0f\n", player.currentHP, player.maxHP);
-            }
-        }
-
-        // Hồi sinh nếu hết máu
-        if (player.currentHP <= 0.0f) {
-            Vector2 sp = MapGetSpawnPoint(map);
-            player.position = sp;
+        if (map) {
             player.groundY = MapGetGroundY(map, player.position.x, player.position.y);
-            player.currentHP = player.maxHP;
-            player.velocity = (Vector2){0, 0};
-            player.hurtTimer = 0.0f;
-            player.isJumping = false;
-            printf("PLAYER DIED! Respawning to tutorial spawnpoint...\n");
-        }
+            
+            float oldX = player.position.x;
+            UpdatePlayer(&player, dt);
+            
+            // Va chạm tường
+            if (MapCheckWallCollision(map, player.position)) {
+                player.position.x = oldX;
+            }
+            
+            // Va chạm trần
+            float ceilingY = MapGetCeilingY(map, player.position.x, player.position.y);
+            if (ceilingY != -9999.0f) {
+                float headOffset = 36.0f;
+                if (player.position.y - headOffset < ceilingY) {
+                    player.position.y = ceilingY + headOffset;
+                    if (player.velocity.y < 0) player.velocity.y = 0;
+                }
+            }
 
-        // Chuyển sang map Boss nếu đi quá rìa trái (X < 16.0f)
-        if (player.position.x < 16.0f) {
-            currentMapIndex = 1;
-            MapUnload(map);
-            map = MapLoad(mapFiles[currentMapIndex]);
-            if (map) {
-                float newMapW = (float)map->width * map->tilewidth;
-                float newMapH = (float)map->height * map->tileheight;
-                player.position.x = newMapW - 24.0f; // Điểm spawn phía bên phải map boss1
-                player.position.y = MapGetGroundY(map, player.position.x, -9999.0f);
-                player.groundY = player.position.y;
+            // Va chạm bẫy
+            Rectangle playerRect = { player.position.x - 12.0f, player.position.y - 36.0f, 24.0f, 36.0f };
+            if (MapCheckLayerCollision(map, "trap", playerRect)) {
+                if (player.hurtTimer <= 0.0f) {
+                    player.currentHP -= 1.0f;
+                    player.hurtTimer = 1.0f;
+                    player.velocity.y = -500.0f;
+                    CameraShake(&myCam, 0.2f, 5.0f);
+                    printf("PLAYER HIT TRAP! HP: %.0f/%.0f\n", player.currentHP, player.maxHP);
+                }
+            }
+
+            // Hồi sinh nếu hết máu
+            if (player.currentHP <= 0.0f) {
+                Vector2 sp = MapGetSpawnPoint(map);
+                player.position = sp;
+                player.groundY = MapGetGroundY(map, player.position.x, player.position.y);
+                player.currentHP = player.maxHP;
+                player.velocity = (Vector2){0, 0};
+                player.hurtTimer = 0.0f;
+                player.isJumping = false;
+                printf("PLAYER DIED! Respawning to tutorial spawnpoint...\n");
+            }
+
+            // Chuyển sang map Boss nếu đi quá rìa trái (X < 16.0f)
+            if (player.position.x < 16.0f) {
+                currentMapIndex = 1;
+                MapUnload(map);
+                map = NULL;
+
+                player.position = (Vector2){-50.0f, 640.0f};
+                player.groundY = 640.0f;
                 player.velocity = (Vector2){0, 0};
                 player.isJumping = false;
                 player.controlsEnabled = false; // Khóa phím khi chạy intro
 
-                // Khởi tạo Boss ở bên trái
-                InitBoss(&boss, (Vector2){300.0f, MapGetGroundY(map, 300.0f, -9999.0f)});
+                // Khởi tạo Boss ở bên phải
+                InitBoss(&boss, (Vector2){950.0f, 640.0f});
                 bossInitialized = true;
 
-                // Cập nhật biên camera cho map mới (boss 1)
-                myCam.zoom = 1.95f;
-                CameraSetBounds(&myCam, newMapW, newMapH, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
-                myCam.bounds.y = 280.0f;
-                myCam.bounds.height = newMapH - 280.0f;
+                myCam.zoom = 1.0f;
+                CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
 
                 // Bắt đầu chuỗi Intro giới thiệu Boss
                 introState = INTRO_WALK_IN;
                 introTimer = 0.0f;
-                printf("Transitioned to boss1.tmj! Spawn X: %.1f, Y: %.1f. Start Intro.\n", player.position.x, player.position.y);
+                printf("Transitioned to Boss Arena! Spawn X: -50.0f. Start Intro.\n");
+            } else {
+                // Giới hạn trong map
+                float mapW = (float)map->width * map->tilewidth;
+                if (player.position.x > mapW - 16.0f) player.position.x = mapW - 16.0f;
             }
-        } else {
-            // Giới hạn trong map
-            if (player.position.x > mapW - 16.0f) player.position.x = mapW - 16.0f;
+
+            // Camera follow player
+            Vector2 camTarget = { player.position.x, player.position.y - 86.0f };
+            CameraUpdate(&myCam, camTarget, dt);
         }
 
-        // Camera follow player
-        Vector2 camTarget = { player.position.x, player.position.y - 86.0f };
-        CameraUpdate(&myCam, camTarget, dt);
-
     } else if (currentMapIndex == 1) {
-        // Map 1: Boss Arena
-        // Cập nhật tọa độ đất động tại vị trí X hiện tại của người chơi
-        player.groundY = MapGetGroundY(map, player.position.x, player.position.y);
+        // Map 1: Boss Arena (Màn hình placeholder vẽ đá)
+        player.groundY = 640.0f;
 
         // --- CẬP NHẬT INTRO & GAMEPLAY STATE ---
         if (introState == INTRO_WALK_IN) {
-            // Mèo tự động di chuyển sang trái (do spawn bên phải)
-            player.position.x -= 160.0f * dt;
-            player.facingRight = false;
+            // Mèo tự động di chuyển sang phải
+            player.position.x += 160.0f * dt;
+            player.facingRight = true;
             player.isRunning = true;
             player.isSprinting = false;
             player.isJumping = false;
@@ -344,8 +353,8 @@ int main(void) {
                 player.currentFrame++;
             }
 
-            if (player.position.x <= 950.0f) {
-                player.position.x = 950.0f;
+            if (player.position.x >= 350.0f) {
+                player.position.x = 350.0f;
                 player.isRunning = false;
                 player.currentFrame = 0;
                 player.frameTimer = 0.0f;
@@ -410,33 +419,43 @@ int main(void) {
         else {
             // Chế độ chơi chính thức (INTRO_FIGHT)
             if (player.currentHP > 0.0f) {
-                float oldX = player.position.x;
                 UpdatePlayer(&player, dt);
 
-                // Va chạm tường
-                if (MapCheckWallCollision(map, player.position)) {
-                    player.position.x = oldX;
-                }
+                if (player.controlsEnabled && player.currentHP > 0.0f) {
+                    if (bossInitialized && boss.isAlive) {
+                        // Khóa trong đấu trường bởi barriers
+                        if (player.position.x < 35.0f) player.position.x = 35.0f;
+                        if (player.position.x > 1315.0f) player.position.x = 1315.0f;
+                    } else {
+                        // Boss đã chết, cho phép đi qua rào chắn sang phải để chuyển map
+                        if (player.position.x < 16.0f) player.position.x = 16.0f;
+                        if (player.position.x > 1315.0f) {
+                            // Chuyển ngược lại về tutorial map
+                            currentMapIndex = 0;
+                            map = MapLoad(mapFiles[currentMapIndex]);
+                            if (map) {
+                                float newMapW = (float)map->width * map->tilewidth;
+                                float newMapH = (float)map->height * map->tileheight;
+                                player.position.x = 24.0f;
+                                player.position.y = MapGetGroundY(map, player.position.x, -9999.0f);
+                                player.groundY = player.position.y;
+                                player.velocity = (Vector2){0, 0};
+                                player.isJumping = false;
+                                player.controlsEnabled = true;
 
-                // Va chạm trần
-                float ceilingY = MapGetCeilingY(map, player.position.x, player.position.y);
-                if (ceilingY != -9999.0f) {
-                    float headOffset = 36.0f;
-                    if (player.position.y - headOffset < ceilingY) {
-                        player.position.y = ceilingY + headOffset;
-                        if (player.velocity.y < 0) player.velocity.y = 0;
-                    }
-                }
+                                bossInitialized = false;
 
-                // Va chạm bẫy
-                Rectangle playerRect = { player.position.x - 12.0f, player.position.y - 36.0f, 24.0f, 36.0f };
-                if (MapCheckLayerCollision(map, "trap", playerRect)) {
-                    if (player.hurtTimer <= 0.0f) {
-                        player.currentHP -= 1.0f;
-                        player.hurtTimer = 1.0f;
-                        player.velocity.y = -500.0f;
-                        CameraShake(&myCam, 0.2f, 5.0f);
-                        printf("PLAYER HIT TRAP IN ARENA! HP: %.0f/%.0f\n", player.currentHP, player.maxHP);
+                                CameraSetBounds(&myCam, newMapW, newMapH, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+                                float zoomX = (float)VIRTUAL_WIDTH / newMapW;
+                                float zoomY = (float)VIRTUAL_HEIGHT / newMapH;
+                                myCam.zoom = (zoomX > zoomY) ? zoomX : zoomY;
+                                myCam.zoom += 0.02f;
+                                if (myCam.zoom < 1.2f) myCam.zoom = 1.2f;
+
+                                introState = INTRO_FIGHT;
+                                printf("Escaped Boss Arena back to tutorial map! Spawn X: %.1f\n", player.position.x);
+                            }
+                        }
                     }
                 }
 
@@ -458,43 +477,6 @@ int main(void) {
             }
         }
 
-        // Chuyển về tutorial map nếu người chơi đi quá rìa phải (X > mapW - 16.0f)
-        float currentMapW = (float)map->width * map->tilewidth;
-        if (player.position.x > currentMapW - 16.0f) {
-            currentMapIndex = 0;
-            MapUnload(map);
-            map = MapLoad(mapFiles[currentMapIndex]);
-            if (map) {
-                float newMapW = (float)map->width * map->tilewidth;
-                float newMapH = (float)map->height * map->tileheight;
-                player.position.x = 24.0f; // Điểm spawn phía bên trái tutorial map
-                player.position.y = MapGetGroundY(map, player.position.x, -9999.0f);
-                player.groundY = player.position.y;
-                player.velocity = (Vector2){0, 0};
-                player.isJumping = false;
-                player.controlsEnabled = true;
-
-                // Vô hiệu hóa Boss
-                bossInitialized = false;
-
-                // Cập nhật biên camera cho map mới
-                CameraSetBounds(&myCam, newMapW, newMapH, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
-                
-                // Cập nhật zoom động cho map mới
-                float zoomX = (float)VIRTUAL_WIDTH / newMapW;
-                float zoomY = (float)VIRTUAL_HEIGHT / newMapH;
-                myCam.zoom = (zoomX > zoomY) ? zoomX : zoomY;
-                myCam.zoom += 0.02f;
-                if (myCam.zoom < 1.2f) myCam.zoom = 1.2f;
-
-                introState = INTRO_FIGHT;
-                printf("Transitioned back to tutorial map! Spawn X: %.1f, Y: %.1f\n", player.position.x, player.position.y);
-            }
-        } else {
-            // Giới hạn trong map
-            if (player.position.x < 16.0f) player.position.x = 16.0f;
-        }
-
         // Cập nhật Camera Target
         Vector2 camTarget = { player.position.x, player.position.y - 86.0f };
         if (introState == INTRO_PAN_TO_BOSS && bossInitialized) {
@@ -502,10 +484,11 @@ int main(void) {
         }
         
         // Thiết lập bounds dựa vào trạng thái Intro
-        float currentMapH = (float)map->height * map->tileheight;
-        CameraSetBounds(&myCam, currentMapW, currentMapH, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
-        myCam.bounds.y = 280.0f;
-        myCam.bounds.height = currentMapH - 280.0f;
+        if (introState == INTRO_FIGHT) {
+            CameraSetBounds(&myCam, 1351.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+        } else {
+            CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+        }
         
         CameraUpdate(&myCam, camTarget, dt);
     }
@@ -547,16 +530,35 @@ int main(void) {
         }
     }
 
-    // Vẽ bản đồ Tiled
-    cute_tiled_layer_t* layer = map->layers;
-    while (layer) {
-        if (layer->visible) {
-            MapDrawLayer(map, layer->name.ptr, 0.0f, texTiles);
+    if (currentMapIndex == 0 && map) {
+        // Vẽ bản đồ Tiled
+        cute_tiled_layer_t* layer = map->layers;
+        while (layer) {
+            if (layer->visible) {
+                MapDrawLayer(map, layer->name.ptr, 0.0f, texTiles);
+            }
+            layer = layer->next;
         }
-        layer = layer->next;
     }
 
     if (currentMapIndex == 1) {
+        // Đấu trường đá (Stone Platform Altar) tự vẽ
+        float arenaWidth = 2500.0f;
+        DrawRectangleRec((Rectangle){ -500, 640, arenaWidth + 1000, 384 }, (Color){16, 16, 24, 255});
+        
+        // Vân kẻ ô lát đá
+        for (float gx = -500; gx < arenaWidth + 500; gx += 64) {
+            DrawLineV((Vector2){ gx, 640 }, (Vector2){ gx, 1024 }, (Color){28, 28, 40, 255});
+        }
+        for (float gy = 640; gy < 1024; gy += 64) {
+            DrawLineV((Vector2){ -500, gy }, (Vector2){ arenaWidth + 500, gy }, (Color){28, 28, 40, 255});
+        }
+        
+        // Viền Neon Đỏ phát sáng
+        DrawLineEx((Vector2){ -500, 640 }, (Vector2){ arenaWidth + 500, 640 }, 4.0f, (Color){255, 46, 99, 255});
+        DrawLineEx((Vector2){ -500, 639 }, (Vector2){ arenaWidth + 500, 639 }, 8.0f, Fade((Color){255, 46, 99, 255}, 0.25f));
+        DrawLineEx((Vector2){ -500, 638 }, (Vector2){ arenaWidth + 500, 638 }, 14.0f, Fade((Color){255, 46, 99, 255}, 0.1f));
+
         // Hiệu ứng hạt bụi phép vàng trôi lơ lửng
         DrawParticles();
         
@@ -566,21 +568,20 @@ int main(void) {
         }
 
         // Vẽ vách ngăn ma thuật biên giới hạn khu vực đấu (Dead Cells style)
-        if (introState == INTRO_FIGHT) {
+        if (introState == INTRO_FIGHT && bossInitialized && boss.isAlive) {
             float barrierAlpha = 0.35f + 0.15f * sinf(GetTime() * 7.0f);
             Color barrierColor = (Color){ 255, 46, 99, (unsigned char)(barrierAlpha * 255) };
             Color glowColor = (Color){ 255, 46, 99, 80 };
             
-            // Vách năng lượng bên trái
-            DrawRectangle(15, 0, 15, 720, barrierColor);
-            DrawRectangleLines(15, 0, 15, 720, (Color){ 255, 100, 120, 255 });
-            DrawRectangleGradientH(30, 0, 30, 720, glowColor, Fade(glowColor, 0.0f));
+            // Vách năng lượng bên trái (x = 15 đến 30)
+            DrawRectangle(15, 0, 15, 640, barrierColor);
+            DrawRectangleLines(15, 0, 15, 640, (Color){ 255, 100, 120, 255 });
+            DrawRectangleGradientH(30, 0, 30, 640, glowColor, Fade(glowColor, 0.0f));
 
-            // Vách năng lượng bên phải (phạm vi đấu trường)
-            float barrierRightX = (float)map->width * map->tilewidth - 30.0f;
-            DrawRectangle((int)barrierRightX, 0, 15, 720, barrierColor);
-            DrawRectangleLines((int)barrierRightX, 0, 15, 720, (Color){ 255, 100, 120, 255 });
-            DrawRectangleGradientH((int)barrierRightX - 30, 0, 30, 720, Fade(glowColor, 0.0f), glowColor);
+            // Vách năng lượng bên phải (x = 1320 đến 1335)
+            DrawRectangle(1320, 0, 15, 640, barrierColor);
+            DrawRectangleLines(1320, 0, 15, 640, (Color){ 255, 100, 120, 255 });
+            DrawRectangleGradientH(1290, 0, 30, 640, Fade(glowColor, 0.0f), glowColor);
         }
     }
 
@@ -671,5 +672,8 @@ int main(void) {
   UnloadSound(introSound);
   CloseAudioDevice();
   CloseWindow();
+  if (map) {
+      MapUnload(map);
+  }
   return 0;
 }
