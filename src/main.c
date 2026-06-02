@@ -195,6 +195,41 @@ int main(void) {
         }
     }
 
+    // --- PHÍM TẮT CHUYỂN NHANH ĐẾN BOSS ARENA ('B') ---
+    if (IsKeyPressed(KEY_B)) {
+        if (currentMapIndex != 1) {
+            currentMapIndex = 1;
+            MapUnload(map);
+            map = MapLoad(mapFiles[currentMapIndex]);
+            if (map) {
+                float newMapW = (float)map->width * map->tilewidth;
+                float newMapH = (float)map->height * map->tileheight;
+                player.position.x = newMapW - 24.0f; // Điểm spawn phía bên phải map boss1
+                player.position.y = MapGetGroundY(map, player.position.x, -9999.0f);
+                player.groundY = player.position.y;
+                player.velocity = (Vector2){0, 0};
+                player.isJumping = false;
+                player.controlsEnabled = false; // Khóa phím khi chạy intro
+
+                // Khởi tạo Boss ở bên trái
+                InitBoss(&boss, (Vector2){300.0f, MapGetGroundY(map, 300.0f, -9999.0f)});
+                bossInitialized = true;
+
+                // Cập nhật biên camera cho map mới (boss 1)
+                myCam.zoom = 1.95f;
+                CameraSetBounds(&myCam, newMapW, newMapH, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+                myCam.bounds.y = 280.0f;
+                myCam.bounds.height = newMapH - 280.0f;
+
+                // Bắt đầu chuỗi Intro giới thiệu Boss
+                introState = INTRO_WALK_IN;
+                introTimer = 0.0f;
+                printf("Teleported to Boss Arena via [B]! Spawn X: %.1f, Y: %.1f. Start Intro.\n", player.position.x, player.position.y);
+            }
+        }
+    }
+
+
     // --- CẬP NHẬT TRẠNG THÁI GAME ---
     if (currentMapIndex == 1) {
         UpdateParticles(dt);
