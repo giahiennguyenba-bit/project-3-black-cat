@@ -78,6 +78,7 @@ typedef struct {
     float   hitResetTimer;              // Timer reset bộ đếm nếu ngừng bị đánh
     
     float   invincibilityTimer;         // I-frames sau khi trúng đòn
+    float   forcefieldTimer;            // Vòng bảo vệ cản vật lý (Concierge style)
 } Boss;
 
 // Lifecycle functions

@@ -139,7 +139,7 @@ int main(void) {
       myCam.zoom += 0.02f;
       if (myCam.zoom < 1.2f) myCam.zoom = 1.2f;
   } else {
-      myCam.zoom = 1.0f;
+      myCam.zoom = 1.2f;
       CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
   }
 
@@ -196,8 +196,9 @@ int main(void) {
             // Reset lại Intro
             introState = INTRO_WALK_IN;
             introTimer = 0.0f;
-            myCam.zoom = 1.6f;
-            myCam.boundsEnabled = false;
+            myCam.zoom = 1.2f;
+            myCam.boundsEnabled = true;
+            CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
             CameraLookAt(&myCam, (Vector2){player.position.x, player.position.y - 86.0f});
             printf("Restarted the Boss Fight in Placeholder Arena!\n");
         } else {
@@ -235,8 +236,9 @@ int main(void) {
             InitBoss(&boss, (Vector2){950.0f, 640.0f});
             bossInitialized = true;
 
-            myCam.zoom = 1.6f;
-            myCam.boundsEnabled = false;
+            myCam.zoom = 1.2f;
+            myCam.boundsEnabled = true;
+            CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
             CameraLookAt(&myCam, (Vector2){player.position.x, player.position.y - 86.0f});
 
             // Bắt đầu chuỗi Intro giới thiệu Boss
@@ -315,8 +317,9 @@ int main(void) {
                 InitBoss(&boss, (Vector2){950.0f, 640.0f});
                 bossInitialized = true;
 
-                myCam.zoom = 1.6f;
-                myCam.boundsEnabled = false;
+                myCam.zoom = 1.2f;
+                myCam.boundsEnabled = true;
+                CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
                 CameraLookAt(&myCam, (Vector2){player.position.x, player.position.y - 86.0f});
 
                 // Bắt đầu chuỗi Intro giới thiệu Boss
@@ -480,18 +483,14 @@ int main(void) {
             }
         }
 
-        // Cập nhật Camera Target
+        // Cập nhật Camera Target (Always follow player in all intro/fight states, no boss panning)
         Vector2 camTarget = { player.position.x, player.position.y - 86.0f };
-        if (introState == INTRO_PAN_TO_BOSS && bossInitialized) {
-            camTarget = (Vector2){ boss.position.x, boss.position.y - 86.0f };
-        }
         
-        // Thiết lập bounds dựa vào trạng thái Intro
+        // Thiết lập bounds dựa vào trạng thái Intro (always keep boundsEnabled = true)
         if (introState == INTRO_FIGHT) {
             CameraSetBounds(&myCam, 1351.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         } else {
-            // Không áp dụng giới hạn biên camera trong quá trình Intro để camera đi theo mèo và lia sang boss
-            myCam.boundsEnabled = false;
+            CameraSetBounds(&myCam, 2500.0f, 720.0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         }
         
         CameraUpdate(&myCam, camTarget, dt);
