@@ -360,80 +360,11 @@ void UpdateBoss(Boss *boss, Player *player, MyCamera *cam, float dt) {
                         CameraShake(cam, 0.4f, 8.0f);
                         TraceLog(LOG_INFO, "Wind Push activated! Smooth push triggered.");
                         
-                        // Ở Phase 2: Kích hoạt Aura Invincibility và Cản Vật Lý trong 7s
+                        // Ở Phase 2: Kích hoạt Aura Invincibility và Cản Vật Lý trong 6.2s
                         if (boss->currentPhase == 2) {
-                            boss->invincibilityTimer = 7.0f;
-                            boss->forcefieldTimer = 7.0f;
-                            TraceLog(LOG_INFO, "Boss activated physical Concierge Forcefield in Phase 2 for 7s!");
-                        }
-                        
-                        // Ngay khi đẩy ra, kích hoạt cast spell ngẫu nhiên ngay lập tức
-                        int randomSpell = GetRandomValue(0, 3);
-                        boss->projectile.active = true;
-                        boss->projectile.type = (SpellType)randomSpell;
-                        boss->projectile.state = 0;
-                        boss->projectile.stateTimer = 0.0f;
-                        boss->projectile.currentFrame = 0;
-                        boss->projectile.frameTimer = 0.0f;
-                        
-                        float dir = boss->facingRight ? 1.0f : -1.0f;
-                        
-                        if (boss->projectile.type == SPELL_DARK_BOLT) {
-                            boss->projectile.position = (Vector2){ boss->position.x + (boss->facingRight ? 50.0f : -50.0f), boss->position.y - 45.0f };
-                            boss->projectile.velocity = (Vector2){ dir * 700.0f, 0.0f };
-                            boss->projectile.radius = 20.0f;
-                            boss->projectile.damage = 15.0f;
-                            boss->projectile.maxFrames = 12;
-                        }
-                        else if (boss->projectile.type == SPELL_FIRE_BOMB) {
-                            boss->projectile.position = (Vector2){ player->position.x, player->groundY };
-                            boss->projectile.velocity = (Vector2){ 0.0f, 0.0f };
-                            boss->projectile.targetPos = player->position;
-                            boss->projectile.radius = (boss->currentPhase == 2) ? 60.0f : 57.5f;
-                            boss->projectile.damage = 25.0f;
-                            boss->projectile.maxFrames = 15;
-                            boss->projectile.state = 1; // Nổ ngay lập tức
-                        }
-                        else if (boss->projectile.type == SPELL_LIGHTNING) {
-                            float offsets[4] = { -240.0f, -80.0f, 80.0f, 240.0f };
-                            for (int j = 0; j < 4; j++) {
-                                float randomOffset = (float)GetRandomValue(-15, 15);
-                                boss->lightningStrikes[j].active = true;
-                                boss->lightningStrikes[j].type = SPELL_LIGHTNING;
-                                boss->lightningStrikes[j].state = 0;
-                                boss->lightningStrikes[j].stateTimer = 0.0f;
-                                boss->lightningStrikes[j].position = (Vector2){ player->position.x + offsets[j] + randomOffset, player->groundY };
-                                boss->lightningStrikes[j].radius = 30.0f;
-                                boss->lightningStrikes[j].damage = 20.0f;
-                                boss->lightningStrikes[j].maxFrames = 11;
-                                boss->lightningStrikes[j].currentFrame = 0;
-                                boss->lightningStrikes[j].frameTimer = 0.0f;
-                            }
-                            boss->projectile.active = false;
-                        }
-                        else if (boss->projectile.type == SPELL_DEATH_SPELL) {
-                            boss->projectile.position = (Vector2){ player->position.x, player->groundY };
-                            boss->projectile.velocity = (Vector2){ 0, 0 };
-                            boss->projectile.radius = 45.0f;
-                            boss->projectile.damage = 35.0f;
-                            boss->projectile.maxFrames = 16;
-                            
-                            if (boss->currentPhase == 3) {
-                                for (int j = 0; j < 2; j++) {
-                                    boss->deathSpells[j].active = true;
-                                    boss->deathSpells[j].type = SPELL_DEATH_SPELL;
-                                    boss->deathSpells[j].state = 0;
-                                    boss->deathSpells[j].stateTimer = 0.0f;
-                                    float offset = (j == 0) ? -120.0f : 120.0f;
-                                    boss->deathSpells[j].position = (Vector2){ player->position.x + offset, player->groundY };
-                                    boss->deathSpells[j].velocity = (Vector2){ 0, 0 };
-                                    boss->deathSpells[j].radius = 40.0f;
-                                    boss->deathSpells[j].damage = 25.0f;
-                                    boss->deathSpells[j].maxFrames = 16;
-                                    boss->deathSpells[j].currentFrame = 0;
-                                    boss->deathSpells[j].frameTimer = 0.0f;
-                                }
-                            }
+                            boss->invincibilityTimer = 6.2f;
+                            boss->forcefieldTimer = 6.2f;
+                            TraceLog(LOG_INFO, "Boss activated physical Concierge Forcefield in Phase 2 for 6.2s!");
                         }
                     }
                     else if (!boss->projectile.active) {
@@ -508,6 +439,77 @@ void UpdateBoss(Boss *boss, Player *player, MyCamera *cam, float dt) {
                                     boss->deathSpells[i].currentFrame = 0;
                                     boss->deathSpells[i].frameTimer = 0.0f;
                                 }
+                            }
+                        }
+                    }
+                }
+                
+                // Sau 0.4s (4 frames từ frame 5), tức là ở frame 9, tung phép ngẫu nhiên cho chiêu đẩy gió
+                if (boss->currentFrame == 9 && boss->attackPattern == 99) {
+                    int randomSpell = GetRandomValue(0, 3);
+                    boss->projectile.active = true;
+                    boss->projectile.type = (SpellType)randomSpell;
+                    boss->projectile.state = 0;
+                    boss->projectile.stateTimer = 0.0f;
+                    boss->projectile.currentFrame = 0;
+                    boss->projectile.frameTimer = 0.0f;
+                    
+                    float dir = boss->facingRight ? 1.0f : -1.0f;
+                    
+                    if (boss->projectile.type == SPELL_DARK_BOLT) {
+                        boss->projectile.position = (Vector2){ boss->position.x + (boss->facingRight ? 50.0f : -50.0f), boss->position.y - 45.0f };
+                        boss->projectile.velocity = (Vector2){ dir * 700.0f, 0.0f };
+                        boss->projectile.radius = 20.0f;
+                        boss->projectile.damage = 15.0f;
+                        boss->projectile.maxFrames = 12;
+                    }
+                    else if (boss->projectile.type == SPELL_FIRE_BOMB) {
+                        boss->projectile.position = (Vector2){ player->position.x, player->groundY };
+                        boss->projectile.velocity = (Vector2){ 0.0f, 0.0f };
+                        boss->projectile.targetPos = player->position;
+                        boss->projectile.radius = (boss->currentPhase == 2) ? 60.0f : 57.5f;
+                        boss->projectile.damage = 25.0f;
+                        boss->projectile.maxFrames = 15;
+                        boss->projectile.state = 1; // Nổ ngay lập tức
+                    }
+                    else if (boss->projectile.type == SPELL_LIGHTNING) {
+                        float offsets[4] = { -240.0f, -80.0f, 80.0f, 240.0f };
+                        for (int j = 0; j < 4; j++) {
+                            float randomOffset = (float)GetRandomValue(-15, 15);
+                            boss->lightningStrikes[j].active = true;
+                            boss->lightningStrikes[j].type = SPELL_LIGHTNING;
+                            boss->lightningStrikes[j].state = 0;
+                            boss->lightningStrikes[j].stateTimer = 0.0f;
+                            boss->lightningStrikes[j].position = (Vector2){ player->position.x + offsets[j] + randomOffset, player->groundY };
+                            boss->lightningStrikes[j].radius = 30.0f;
+                            boss->lightningStrikes[j].damage = 20.0f;
+                            boss->lightningStrikes[j].maxFrames = 11;
+                            boss->lightningStrikes[j].currentFrame = 0;
+                            boss->lightningStrikes[j].frameTimer = 0.0f;
+                        }
+                        boss->projectile.active = false;
+                    }
+                    else if (boss->projectile.type == SPELL_DEATH_SPELL) {
+                        boss->projectile.position = (Vector2){ player->position.x, player->groundY };
+                        boss->projectile.velocity = (Vector2){ 0, 0 };
+                        boss->projectile.radius = 45.0f;
+                        boss->projectile.damage = 35.0f;
+                        boss->projectile.maxFrames = 16;
+                        
+                        if (boss->currentPhase == 3) {
+                            for (int j = 0; j < 2; j++) {
+                                boss->deathSpells[j].active = true;
+                                boss->deathSpells[j].type = SPELL_DEATH_SPELL;
+                                boss->deathSpells[j].state = 0;
+                                boss->deathSpells[j].stateTimer = 0.0f;
+                                float offset = (j == 0) ? -120.0f : 120.0f;
+                                boss->deathSpells[j].position = (Vector2){ player->position.x + offset, player->groundY };
+                                boss->deathSpells[j].velocity = (Vector2){ 0, 0 };
+                                boss->deathSpells[j].radius = 40.0f;
+                                boss->deathSpells[j].damage = 25.0f;
+                                boss->deathSpells[j].maxFrames = 16;
+                                boss->deathSpells[j].currentFrame = 0;
+                                boss->deathSpells[j].frameTimer = 0.0f;
                             }
                         }
                     }
@@ -1004,7 +1006,7 @@ void UpdateBoss(Boss *boss, Player *player, MyCamera *cam, float dt) {
                 if (distToBoss < (boss->auraSparks[i].radius + 45.0f)) {
                     boss->auraSparks[i].active = false;
                     if (boss->state != BOSS_STATE_DEATH) {
-                        boss->currentHP -= 4.0f; // Sát thương to gấp 2 lần chém thường
+                        boss->currentHP -= 4.0f; // Sát thương to gấp 2 lần chém thường (Xuyên Giáp/Khiên)
                         if (boss->currentHP < 0) boss->currentHP = 0;
                         
                         if (boss->state != BOSS_STATE_ATTACK && boss->state != BOSS_STATE_CAST) {
@@ -1016,7 +1018,7 @@ void UpdateBoss(Boss *boss, Player *player, MyCamera *cam, float dt) {
                             boss->position.x += kb;
                         }
                         CameraShake(cam, 0.3f, 8.0f); // Rung lắc cực mạnh khi trúng phản đạn
-                        TraceLog(LOG_INFO, "Boss hit by reflected Spark ball! DMG: 4.0. Current HP: %.1f", boss->currentHP);
+                        TraceLog(LOG_INFO, "Boss hit by reflected Spark ball (Shield Pierced)! DMG: 4.0. Current HP: %.1f", boss->currentHP);
                     }
                 }
             }
@@ -1472,6 +1474,21 @@ void DrawBoss(Boss *boss, float scale) {
         DrawEllipseLines((int)center.x, (int)center.y, rH, rV, shieldBorder);
         DrawEllipseLines((int)center.x, (int)center.y, rH + 2.0f, rV + 2.0f, shieldOuterBorder);
         DrawEllipseLines((int)center.x, (int)center.y, rH - 2.0f, rV - 2.0f, Fade(shieldBorder, 0.4f));
+        
+        // Thêm hiệu ứng sét sét giật giật (Electric Sparks) bao quanh khiên
+        int sparkCount = GetRandomValue(3, 6);
+        for (int i = 0; i < sparkCount; i++) {
+            float angle = (float)GetRandomValue(0, 360) * DEG2RAD;
+            float rOffset = (float)GetRandomValue(-5, 10);
+            Vector2 start = { center.x + (rH + rOffset) * cosf(angle), center.y + (rV + rOffset) * sinf(angle) };
+            
+            float angle2 = angle + (float)GetRandomValue(-20, 20) * DEG2RAD;
+            float rOffset2 = (float)GetRandomValue(-5, 15);
+            Vector2 end = { center.x + (rH + rOffset2) * cosf(angle2), center.y + (rV + rOffset2) * sinf(angle2) };
+            
+            Color sparkColor = (GetRandomValue(0, 1) == 0) ? WHITE : (Color){ 200, 150, 255, 200 };
+            DrawLineEx(start, end, (float)GetRandomValue(1, 3), sparkColor);
+        }
     }
 }
 
