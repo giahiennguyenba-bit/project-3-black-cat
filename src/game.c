@@ -18,11 +18,14 @@ void InitPlayer(Player *player, Vector2 pos) {
     player->maxHP = 9.0f;
     player->currentHP = 9.0f;
     player->hurtTimer = 0.0f;
+    player->jumpBufferTimer = 0.0f;
+    player->coyoteTimeTimer = 0.0f;
 }
 
 void UpdatePlayer(Player *player, float deltaTime) {
     const float gravity = 4000.0f;
-    const float jumpForce = -1200.0f;  // Tăng từ -900 lên -1200 để nhảy cao qua đầu Boss
+    extern int currentMapIndex;
+    float currentJumpForce = (currentMapIndex == 0) ? -900.0f : -1200.0f; // Giảm lực nhảy ở map parkour (-900) so với map boss (-1200)
     
     player->isRunning = false; 
     player->isSprinting = false;
@@ -31,6 +34,15 @@ void UpdatePlayer(Player *player, float deltaTime) {
 
     if (player->freezeTimer > 0) player->freezeTimer -= deltaTime;
     if (player->hurtTimer > 0) player->hurtTimer -= deltaTime;
+    
+    // Cập nhật bộ đệm nhảy và thời gian coyote
+    if (player->jumpBufferTimer > 0.0f) player->jumpBufferTimer -= deltaTime;
+    if (player->coyoteTimeTimer > 0.0f) player->coyoteTimeTimer -= deltaTime;
+
+    // Reset coyote time khi ở trên mặt đất và không đang đi lên (không đang nhảy)
+    if (player->position.y >= player->groundY - 5.0f && player->velocity.y >= 0.0f) {
+        player->coyoteTimeTimer = 0.12f; // Cho phép nhảy trễ 0.12s sau khi rời đất
+    }
 
     if (player->controlsEnabled) {
         if (IsKeyDown(KEY_LEFT_SHIFT)) { 
@@ -49,14 +61,14 @@ void UpdatePlayer(Player *player, float deltaTime) {
         if (player->isAttacking) animSpeed = 0.07f;
         if (player->isHurt) animSpeed = 0.12f;
         
-        // Nhảy bằng SPACE hoặc phím W (Cho phép nhảy nếu sát mặt đất để tăng độ nhạy và giảm delay)
-        if ((IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_W)) && (player->position.y >= player->groundY - 5.0f)) {
-            player->velocity.y = jumpForce;
-            player->isJumping = true;
-            if (!player->isAttacking) {
-                player->currentFrame = 0;
-                player->frameTimer = 0.0f;
-            }
+        // Ghi nhận nút nhảy vào bộ đệm (nhạy hơn)
+        if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_W)) {
+            player->jumpBufferTimer = 0.15f; // Lưu trữ lệnh nhảy 0.15s
+        }
+
+        // Nhả nút nhảy sớm (Variable Jump Height) để giảm chiều cao nhảy nếu chỉ nhấp nhẹ
+        if ((IsKeyReleased(KEY_SPACE) || IsKeyReleased(KEY_W)) && player->velocity.y < -300.0f) {
+            player->velocity.y = -300.0f;
         }
 
         // Cho phép điều khiển ngang cả khi đang trên không bằng phím mũi tên hoặc A/D
@@ -71,6 +83,18 @@ void UpdatePlayer(Player *player, float deltaTime) {
                 player->facingRight = false;
                 player->isRunning = true;
             }
+        }
+    }
+
+    // Thực hiện nhảy từ bộ đệm nếu hợp lệ
+    if (player->jumpBufferTimer > 0.0f && player->coyoteTimeTimer > 0.0f) {
+        player->velocity.y = currentJumpForce;
+        player->isJumping = true;
+        player->jumpBufferTimer = 0.0f;
+        player->coyoteTimeTimer = 0.0f;
+        if (!player->isAttacking) {
+            player->currentFrame = 0;
+            player->frameTimer = 0.0f;
         }
     }
 
@@ -103,7 +127,6 @@ void UpdatePlayer(Player *player, float deltaTime) {
     if (player->isHurt && player->currentFrame >= 4) {
         player->isHurt = false;
     }
-
 }
 
 void DrawPlayer(Player *player, Texture2D idle, Texture2D walk, Texture2D run, Texture2D jump, Texture2D attack, Texture2D hurt, int frameW, int frameH, float scale) {

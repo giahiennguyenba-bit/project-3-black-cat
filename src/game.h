@@ -23,6 +23,8 @@ typedef struct {
     float   maxHP;
     float   currentHP;
     float   hurtTimer;
+    float   jumpBufferTimer;
+    float   coyoteTimeTimer;
 } Player;
 
 // --- API Nhân vật ---
